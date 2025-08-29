@@ -64,7 +64,7 @@ Connections[1] = Run.Heartbeat:Connect(function()
 		return
 	end
 
-	if getgenv().espTeamMate then
+	if getgenv().espTeamMates then
 		for _, player in ipairs(teammates) do
 			local character = player.Character
 			local hrp = character and character:FindFirstChild("HumanoidRootPart")
