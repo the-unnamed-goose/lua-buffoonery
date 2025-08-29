@@ -44,6 +44,7 @@ local function shootGun(tool, targetPosition)
 	if getgenv().controller.lock.gun or getgenv().controller.lock.general then
 		return
 	end
+	getgenv().controller.lock.gun = true
 
 	if not canShoot(tool) then
 		return
@@ -87,6 +88,7 @@ local function shootGun(tool, targetPosition)
 	local hitInstance = hitResult and hitResult.Instance
 	local hitPosition = hitResult and hitResult.Position
 	shootGunRemote:FireServer(characterOrigin, finalTarget, hitInstance, hitPosition)
+	getgenv().controller.lock.gun = false
 end
 
 local function handleGunInput(tool)
@@ -122,12 +124,17 @@ local function onGunEquipped(tool)
 	end))
 end
 
+local characterConnection
 return player.CharacterAdded:Connect(function(new)
 	character = new
 	humanoid = character:WaitForChild("Humanoid")
 	animator = humanoid:WaitForChild("Animator")
 
-	character.ChildAdded:Connect(function(child)
+	if characterConnection then
+		characterConnection:Disconnect()
+	end
+
+	characterConnection = character.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.GUN_TOOL) then
 			onGunEquipped(child)
 		end

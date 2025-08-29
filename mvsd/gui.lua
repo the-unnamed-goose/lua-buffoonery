@@ -16,6 +16,8 @@ getgenv().aimConfig = {
 	AIM_DEVIATION = 10,
 	RAYCAST_DISTANCE = 1000,
 }
+getgenv().espTeamMates = true
+getgenv().ESPEnemies = true
 getgenv().killButton = { gun = false, knife = false }
 getgenv().killLoop = { gun = false, knife = false }
 

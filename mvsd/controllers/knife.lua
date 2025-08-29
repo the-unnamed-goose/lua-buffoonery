@@ -38,14 +38,14 @@ local throwStartRemote = Replicated.Remotes.ThrowStart
 local throwHitRemote = Replicated.Remotes.ThrowHit
 local stabRemote = Replicated.Remotes.Stab
 
-local isStabMode = false
+local isStabMode = true
 local currentThrowPromise = nil
 local currentTool = nil
 local maid = Maid.new()
 
 touchControlsGui.Parent = playerGui
 local hasMouseEnabled = Input.MouseEnabled
-local hasTouchEnabled = Input.TouchEnabled and not Input.KeyboardEnabled
+local hasTouchEnabled = Input.TouchEnabled and not Input.MouseEnabled
 
 if hasTouchEnabled then
 	spawn(function()
@@ -225,6 +225,7 @@ end
 
 local chargeAnimationTrack = animator:LoadAnimation(throwAnimation)
 local function handleMouseThrowInput(tool)
+	getgenv().controller.lock.knife = true
 	local isCharged = false
 	local chargePromise = nil
 
@@ -289,9 +290,11 @@ local function handleMouseThrowInput(tool)
 		chargeAnimationTrack:Stop()
 		setKnifeHandleTransparency(tool, 0)
 	end)
+	getgenv().controller.lock.knife = false
 end
 
 local function handleThrowInput(tool)
+	getgenv().controller.lock.knife = true
 	maid:GiveTask(throwButton.MouseButton1Down:Connect(function()
 		isStabMode = not isStabMode
 		modeLabel.Text = isStabMode and "Throw Mode" or "Stab Mode"
@@ -329,6 +332,7 @@ local function handleThrowInput(tool)
 			throwKnife(tool, worldPosition)
 		end
 	end))
+	getgenv().controller.lock.knife = false
 end
 
 local function onKnifeEquipped(tool)
@@ -354,12 +358,17 @@ local function onKnifeEquipped(tool)
 	end))
 end
 
+local characterConnection
 return player.CharacterAdded:Connect(function(new)
 	character = new
 	humanoid = character:WaitForChild("Humanoid")
 	animator = humanoid:WaitForChild("Animator")
 
-	character.ChildAdded:Connect(function(child)
+	if characterConnection then
+		characterConnection:Disconnect()
+	end
+
+	characterConnection = character.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.KNIFE_TOOL) then
 			onKnifeEquipped(child)
 		end
