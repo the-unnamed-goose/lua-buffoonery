@@ -12,7 +12,7 @@ getgenv().aimConfig = {
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
-	REACTION_TIME = 0,
+	REACTION_TIME = 0.17,
 	ACTION_TIME = 0.3,
 	AUTO_EQUIP = true,
 	NATIVE_UI = true,
@@ -41,8 +41,9 @@ local throwHitRemote = remotes:WaitForChild("ThrowHit")
 local bulletRenderer = require(modules:WaitForChild("BulletRenderer"))
 local knifeController = require(modules:WaitForChild("KnifeProjectileController"))
 
-local lock = { gun = false, knife = false, general = false }
-local gunCooldown = 0
+getgenv().controller = {}
+getgenv().controller.lock = { gun = false, knife = false, general = false }
+getgenv().controller.gunCooldown = 0
 local progressTween
 
 local raycastParams = RaycastParams.new()
@@ -67,20 +68,6 @@ local function initializePlayer()
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum and hum:WaitForChild("Animator")
 	playerReferences = { char, hrp, animator }
-
-	local playerModel = Workspace:FindFirstChild(player.Name)
-	if playerModel then
-		local gun = playerModel:FindFirstChild("GunController")
-		if gun then
-			gun:Destroy()
-		end
-
-		-- Uncomment this paragraph if you have misfiring/double throw issues in knife combat
-		-- local knife = playerModel:FindFirstChild("KnifeController")
-		-- if knife then
-		-- 	 knife:Destroy()
-		-- end
-	end
 end
 
 local function isInFov(pos)
@@ -360,26 +347,26 @@ local function renderCooldown(tool)
 end
 
 local function fireGun(targetPos, hitPart, localHrp, animator)
-	if lock.gun then
+	if getgenv().controller.lock.gun then
 		return
 	end
-	lock.gun = true
+	getgenv().controller.lock.gun = true
 
 	local gun = getWeapon(WEAPON_TYPE.GUN)
 	if not gun then
-		lock.gun = false
+		getgenv().controller.lock.gun = false
 		return
 	end
 
 	local cooldown = gun:GetAttribute("Cooldown") or 2.5
-	if tick() - gunCooldown < cooldown then
-		lock.gun = false
+	if tick() - getgenv().controller.gunCooldown < cooldown then
+		getgenv().controller.lock.gun = false
 		return
 	end
 
 	local muzzle = gun:FindFirstChild("Muzzle", true)
 	if not muzzle then
-		lock.gun = false
+		getgenv().controller.lock.gun = false
 		return
 	end
 
@@ -413,28 +400,28 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 	bulletRenderer(muzzlePos, finalPos, "Default")
 	shootRemote:FireServer(muzzlePos, finalPos, actualHitPart or hitPart, finalPos)
 
-	gunCooldown = tick()
+	getgenv().controller.gunCooldown = tick()
 	renderCooldown(gun)
 
 	task.wait(animTrack.Length or 0.5)
-	lock.gun = false
+	getgenv().controller.lock.gun = false
 end
 
 local function throwKnife(targetPos, hitPart, localHrp, animator)
-	if lock.knife then
+	if getgenv().controller.lock.knife then
 		return
 	end
-	lock.knife = true
+	getgenv().controller.lock.knife = true
 
 	local knife = getWeapon(WEAPON_TYPE.KNIFE)
 	if not knife then
-		lock.knife = false
+		getgenv().controller.lock.knife = false
 		return
 	end
 
 	local handle = knife:FindFirstChild("RightHandle")
 	if not handle then
-		lock.knife = false
+		getgenv().controller.lock.knife = false
 		return
 	end
 
@@ -461,7 +448,7 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 			throwHitRemote:FireServer(result.Instance, result.Position)
 		end
 		task.wait(1)
-		lock.knife = false
+		getgenv().controller.lock.knife = false
 	end)
 end
 
@@ -510,10 +497,10 @@ local function equipWeapon(weaponType, callback)
 
 	if currentTool then
 		humanoid:UnequipTools()
-		lock.general = true
+		getgenv().controller.lock.general = true
 		task.wait(getgenv().aimConfig.ACTION_TIME)
 		if targetTool.Parent ~= player.Backpack then
-			lock.general = false
+			getgenv().controller.lock.general = false
 			if callback then
 				callback(false, "Tool no longer available")
 			end
@@ -521,15 +508,15 @@ local function equipWeapon(weaponType, callback)
 		end
 		humanoid:EquipTool(targetTool)
 		task.wait(getgenv().aimConfig.ACTION_TIME)
-		lock.general = false
+		getgenv().controller.lock.general = false
 		if callback then
 			callback(true, targetTool)
 		end
 	else
 		humanoid:EquipTool(targetTool)
-		lock.general = true
+		getgenv().controller.lock.general = true
 		task.wait(getgenv().aimConfig.ACTION_TIME)
-		lock.general = false
+		getgenv().controller.lock.general = false
 		if callback then
 			callback(true, targetTool)
 		end
@@ -537,17 +524,17 @@ local function equipWeapon(weaponType, callback)
 end
 
 local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifePoint, localHrp, animator)
-	if lock.general then
+	if getgenv().controller.lock.general then
 		return
 	end
-	lock.general = true
+	getgenv().controller.lock.general = true
 
 	if bestTarget and bestPart and not isValidTarget(bestTarget, localHrp) then
-		lock.general = false
+		getgenv().controller.lock.general = false
 		return
 	end
 	if bestKnifeTarget and bestKnifePoint and not isValidTarget(bestKnifeTarget, localHrp) then
-		lock.general = false
+		getgenv().controller.lock.general = false
 		return
 	end
 
@@ -564,8 +551,8 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 
 	local gunAvailable = gunEquipped or gunInBackpack
 	local gunReady = gunAvailable
-		and not lock.gun
-		and (tick() - gunCooldown >= ((gunEquipped or gunInBackpack):GetAttribute("Cooldown") or 2.5))
+		and not getgenv().controller.lock.gun
+		and (tick() - getgenv().controller.gunCooldown >= ((gunEquipped or gunInBackpack):GetAttribute("Cooldown") or 2.5))
 
 	local knifeEquipped = getWeapon(WEAPON_TYPE.KNIFE)
 	local knifeInBackpack = nil
@@ -578,12 +565,13 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 		end
 	end
 
-	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not lock.knife
+	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controller.lock.knife
 
 	if gunReady then
 		if gunEquipped then
+		  task.wait(getgenv().aimConfig.REACTION_TIME)
 			fireGun(bestPart.Position, bestPart, localHrp, animator)
-			lock.general = false
+			getgenv().controller.lock.general = false
 		else
 			equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
 				if success and bestPart and bestPart.Parent then
@@ -593,7 +581,7 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 						fireGun(bestPart.Position, bestPart, localHrp, animator)
 					end
 				end
-				lock.general = false
+				getgenv().controller.lock.general = false
 			end)
 		end
 	elseif knifeAvailable then
@@ -601,10 +589,11 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 			if bestKnifeTarget and bestKnifePoint and isValidTarget(bestKnifeTarget, localHrp) then
 				local targetHrp = bestKnifeTarget.Character:FindFirstChild("HumanoidRootPart")
 				if targetHrp then
+				  task.wait(getgenv().aimConfig.REACTION_TIME)
 					throwKnife(bestKnifePoint, targetHrp, localHrp, animator)
 				end
 			end
-			lock.general = false
+			getgenv().controller.lock.general = false
 		else
 			equipWeapon(WEAPON_TYPE.KNIFE, function(success, knife)
 				if success then
@@ -616,11 +605,11 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 						end
 					end
 				end
-				lock.general = false
+				getgenv().controller.lock.general = false
 			end)
 		end
 	else
-		lock.general = false
+		getgenv().controller.lock.general = false
 	end
 end
 
@@ -648,7 +637,7 @@ local function handleCombat()
 		return
 	end
 
-	if lock.general then
+	if getgenv().controller.lock.general then
 		return
 	end
 
@@ -657,22 +646,19 @@ local function handleCombat()
 		return
 	end
 
-	if getgenv().aimConfig.REACTION_TIME > 0 then
-		task.wait(getgenv().aimConfig.REACTION_TIME)
-	end
-
+	task.wait(getgenv().aimConfig.REACTION_TIME)
 	if not isValidTarget(bestTarget, localHrp) then
 		return
 	end
 
 	local equipType = weapon:GetAttribute("EquipAnimation")
 	if equipType == WEAPON_TYPE.GUN then
-		local gunReady = not lock.gun and (tick() - gunCooldown >= (weapon:GetAttribute("Cooldown") or 2.5))
+		local gunReady = not getgenv().controller.lock.gun and (tick() - getgenv().controller.gunCooldown >= (weapon:GetAttribute("Cooldown") or 2.5))
 		if gunReady and bestPart and bestPart.Parent then
 			fireGun(bestPart.Position, bestPart, localHrp, animator)
 		end
 	elseif equipType == WEAPON_TYPE.KNIFE then
-		if not lock.knife and bestKnifeTarget and bestKnifePoint and isValidTarget(bestKnifeTarget, localHrp) then
+		if not getgenv().controller.lock.knife and bestKnifeTarget and bestKnifePoint and isValidTarget(bestKnifeTarget, localHrp) then
 			local targetHrp = bestKnifeTarget.Character:FindFirstChild("HumanoidRootPart")
 			if targetHrp then
 				throwKnife(bestKnifePoint, targetHrp, localHrp, animator)
@@ -681,12 +667,8 @@ local function handleCombat()
 	end
 end
 
-if getgenv().aimConnections then
-	for _, connection in pairs(getgenv().aimConnections) do
-		connection:Disconnect()
-	end
-end
-getgenv().aimConnections = {}
+local Connections = {}
+Connections[0] = Run.RenderStepped:Connect(handleCombat)
+Connections[1] = player.CharacterAdded:Connect(initializePlayer)
 
-getgenv().aimConnections[0] = Run.RenderStepped:Connect(handleCombat)
-getgenv().aimConnections[1] = player.CharacterAdded:Connect(initializePlayer)
+return Connections

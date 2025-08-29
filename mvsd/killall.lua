@@ -70,14 +70,8 @@ local function killAllGun()
 	end
 end
 
-if getgenv().killConnections then
-	for _, connection in pairs(getgenv().killConnections) do
-		connection:Disconnect()
-	end
-end
-getgenv().killConnections = {}
-
-getgenv().killConnections[0] = Run.Heartbeat:Connect(function()
+local Connections = {}
+Connections[0] = Run.Heartbeat:Connect(function()
 	if getgenv().killButton.knife then
 		equipWeapon(WEAPON_TYPE.knife)
 		killAllKnife()
@@ -91,7 +85,7 @@ getgenv().killConnections[0] = Run.Heartbeat:Connect(function()
 	end
 end)
 
-getgenv().killConnections[1] = Run.Heartbeat:Connect(function()
+Connections[1] = Run.Heartbeat:Connect(function()
 	enemyCache = {}
 	for _, enemy in pairs(Players:GetPlayers()) do
 		if enemy and enemy ~= localPlayer and enemy.Team and enemy.Team ~= localPlayer.Team then
@@ -105,7 +99,7 @@ getgenv().killConnections[1] = Run.Heartbeat:Connect(function()
 	end
 end)
 
-getgenv().killConnections[2] = Run.RenderStepped:Connect(function()
+Connections[2] = Run.RenderStepped:Connect(function()
 	if getgenv().killLoop.gun and not lock.gun then
 		killAllGun()
 	end
@@ -115,7 +109,7 @@ getgenv().killConnections[2] = Run.RenderStepped:Connect(function()
 	end
 end)
 
-getgenv().killConnections[3] = localPlayer.CharacterAdded:Connect(function()
+Connections[3] = localPlayer.CharacterAdded:Connect(function()
 	local character = localPlayer.Character
 	if not character then
 		return
@@ -150,4 +144,4 @@ getgenv().killConnections[3] = localPlayer.CharacterAdded:Connect(function()
 	end)
 end)
 
-Window:SelectTab(1)
+return Connections

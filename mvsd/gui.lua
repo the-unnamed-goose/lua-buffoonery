@@ -1,13 +1,13 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://bitbucket.org/lua-buffoonery/scripts/raw/6f3ceec427438d302ff89684a25aa6c12c63b396/"
+local Repository = "https://bitbucket.org/lua-buffoonery/scripts/raw/ea1d852fbc75e549db0a427892be7769805248d7/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
-	REACTION_TIME = 0,
+	REACTION_TIME = 0.17,
 	ACTION_TIME = 0.3,
 	AUTO_EQUIP = true,
 	NATIVE_UI = true,
@@ -23,7 +23,7 @@ local Window = Windui:CreateWindow({
 	Title = "[Open Source] MVSD Script",
 	Icon = "square-function",
 	Author = "by Le Honk",
-	Folder = "Graphics",
+	Folder = "MVSD_Graphics",
 	Size = UDim2.fromOffset(260, 280),
 	Transparent = true,
 	Theme = "Dark",
@@ -32,6 +32,7 @@ local Window = Windui:CreateWindow({
 	HideSearchBar = true,
 	ScrollBarEnabled = false,
 })
+local Config = Window.ConfigManager
 
 local modules = {}
 function loadModule(file)
@@ -39,11 +40,12 @@ function loadModule(file)
 		return
 	end
 
-	modules[file] = true
 	table.insert(modules, file)
-	pcall(loadstring(game:HttpGet(Repository .. file)))
+	_, modules[file] = pcall(loadstring(game:HttpGet(Repository .. file)))
 end
 
+local gunToggle
+local knifeToggle
 function lockToggle(origin)
 	if origin == "knife" and gunToggle and gunToggle.Lock then
 		gunToggle:Lock()
@@ -56,10 +58,36 @@ function lockToggle(origin)
 	if gunToggle and gunToggle.Unlock then
 		gunToggle:Unlock()
 	end
-	
+
 	if knifeToggle and knifeToggle.Unlock then
 		knifeToggle:Unlock()
 	end
+end
+
+local defaultConfig = Config:CreateConfig("default")
+local currentConfig = defaultConfig
+local saveName = "default"
+function registerConfig(table)
+	table:Register("AimBotEnabled", aimToggle)
+	table:Register("CameraCast", cameraToggle)
+	table:Register("FOVCheck", fovToggle)
+	table:Register("AutoEquip", equipToggle)
+	table:Register("NativeUI", interfaceToggle)
+	table:Register("DeviationEnabled", deviationToggle)
+
+	table:Register("MaxDistance", distanceSlider)
+	table:Register("VisibleParts", partsSlider)
+	table:Register("ReactionTime", reactionSlider)
+	table:Register("ActionTime", actionSlider)
+	table:Register("PredictionTime", predictionSlider)
+	table:Register("DeviationAmount", deviationAmountSlider)
+
+	table:Register("ESPEnabled", espToggle)
+	table:Register("ESPTeam", teamToggle)
+	table:Register("ESPEnemies", enemyToggle)
+
+	table:Register("LoopKnife", knifeToggle)
+	table:Register("LoopGun", gunToggle)
 end
 
 local Aim = Window:Tab({
@@ -72,12 +100,12 @@ local aimToggle = Aim:Toggle({
 	Title = "Feature status",
 	Desc = "Enable/Disable the aim bot",
 	Callback = function(state)
-		if not state and getgenv().aim_connections then
-			Module["mvsd/aimbot.lua"] = false
-			for _, connection in pairs(getgenv().aim_connections) do
+		local module = modules["mvsd/aimbot.lua"]
+		if not state and module then
+			for _, connection in pairs(module) do
 				connection:Disconnect()
 			end
-			getgenv().aim_connections = nil
+			module = nil
 			return
 		end
 		loadModule("mvsd/aimbot.lua")
@@ -162,7 +190,7 @@ local reactionSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 10,
-		Default = 0,
+		Default = 0.17,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.REACTION_TIME = value
@@ -220,20 +248,15 @@ local espToggle = Esp:Toggle({
 	Title = "Feature status",
 	Desc = "Enable/Disable the ESP",
 	Callback = function(state)
-		if not state then
-			pcall(function()
-				if not state and getgenv().esp_connections then
-					Module["mvsd/esp.lua"] = false
-					for _, connection in pairs(getgenv().esp_connections) do
-						connection:Disconnect()
-					end
-					getgenv().esp_connections = nil
-					return
-				end
-			end)
+		local module = modules["mvsd/esp.lua"]
+		if not state and module then
+			for _, connection in pairs(module) do
+				connection:Disconnect()
+			end
+			module = nil
 			return
 		end
-		loadModule("mvsd/esp.lua")
+		return loadModule("mvsd/esp.lua")
 	end,
 })
 
@@ -252,6 +275,63 @@ local enemyToggle = Esp:Toggle({
 	Value = true,
 	Callback = function(state)
 		getgenv().espEnemies = state
+	end,
+})
+
+local Controls = Window:Tab({
+	Title = "Controls",
+	Icon = "keyboard",
+	Locked = false,
+})
+
+local renewerSystem = Controls:Toggle({
+	Title = "Delete Old Controllers",
+	Desc = "Should not be disabled unless you also want to disable the options bellow",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/init.lua"]
+		if not state and module then
+			for _, connection in pairs(module) do
+				connection:Disconnect()
+			end
+			module = nil
+			return
+		end
+		loadModule("mvsd/controllers/init.lua")
+	end,
+})
+
+local knifeController = Controls:Toggle({
+	Title = "Custom Knife Controller",
+	Desc = "Uses the custom knife input handler, improves support for some features of the game",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/knife.lua"]
+		if not state and module then
+			for _, connection in pairs(module) do
+				connection:Disconnect()
+			end
+			module = nil
+			return
+		end
+		loadModule("mvsd/controllers/knife.lua")
+	end,
+})
+
+local gunController = Controls:Toggle({
+	Title = "Custom Gun Controller",
+	Desc = "Uses the custom gun input handler, improves support for some features of the game",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/gun.lua"]
+		if not state and module then
+			for _, connection in pairs(module) do
+				connection:Disconnect()
+			end
+			module = nil
+			return
+		end
+		loadModule("mvsd/controllers/gun.lua")
 	end,
 })
 
@@ -279,12 +359,12 @@ local gunButton = Kill:Button({
 	end,
 })
 
-local knifeToggle = Kill:Toggle({
+knifeToggle = Kill:Toggle({
 	Title = "[Knife] Loop Kill All",
 	Desc = "Repeatedly kills all players using the knife",
 	Callback = function(state)
 		if state then
-			lockToggle("gun")
+			lockToggle("knife")
 		else
 			lockToggle()
 		end
@@ -293,17 +373,119 @@ local knifeToggle = Kill:Toggle({
 	end,
 })
 
-local gunToggle = Kill:Toggle({
+gunToggle = Kill:Toggle({
 	Title = "[Gun] Loop Kill All",
 	Desc = "Repeatedly kills all players using the gun",
 	Callback = function(state)
 		if state then
-			lockToggle("knife")
+			lockToggle("gun")
 		else
 			lockToggle()
 		end
 		getgenv().killLoop.gun = state
 		loadModule("mvsd/killall.lua")
+	end,
+})
+
+registerConfig(defaultConfig)
+local Configs = Window:Tab({
+	Title = "Config",
+	Icon = "cog",
+	Locked = false,
+})
+
+if defaultConfig then
+	defaultConfig:Load()
+end
+
+Configs:Input({
+	Title = "Config Name",
+	Desc = "Must be something other than 'default' because initialization magic",
+	Value = saveName,
+	Callback = function(value)
+		saveName = value or "default"
+	end,
+})
+
+local Save = Configs:Button({
+	Title = "Save",
+	Desc = "Saves the current configuration down to disk",
+	Callback = function()
+		if not saveName then
+			return
+		end
+
+		if saveName ~= "default" then
+			currentConfig = Config:CreateConfig(saveName)
+			registerConfig(currentConfig)
+		else
+			currentConfig = defaultConfig
+		end
+
+		currentConfig:Save()
+
+		Windui:Notify({
+			Title = "Save Manager",
+			Content = "Saved config " .. saveName,
+			Icon = "check",
+			Duration = 3,
+		})
+	end,
+})
+
+local Default = Configs:Button({
+	Title = "Save As Default",
+	Desc = "Automagically load this file on startup",
+	Callback = function()
+		defaultConfig:Save()
+
+		Windui:Notify({
+			Title = "Save Manager",
+			Content = "Successfully made config the default",
+			Icon = "check",
+			Duration = 3,
+		})
+	end,
+})
+
+local Delete = Configs:Button({
+	Title = "Delete",
+	Desc = "Deletes a saved configuration",
+	Callback = function()
+		if not saveName or saveName == "default" then
+			return
+		end
+		delfile(Config.Path .. saveName .. ".json")
+
+		Windui:Notify({
+			Title = "Save Manager",
+			Content = "Successfully deleted config",
+			Icon = "check",
+			Duration = 3,
+		})
+	end,
+})
+
+local Load = Configs:Button({
+	Title = "Load",
+	Desc = "Loads a saved configuration",
+	Callback = function()
+		if not saveName then
+			return
+		end
+
+		local loadConfig = Config:CreateConfig(saveName)
+		registerConfig(loadConfig)
+
+		loadConfig:Load()
+		currentConfig = loadConfig
+
+		Windui:Notify({
+			Title = "Save Manager",
+			Content = "Config loaded successfully",
+			Icon = "check",
+			Duration = 3,
+		})
 	end,
 })
 

@@ -37,14 +37,8 @@ local function createEnemyBillboard(humanoidRootPart)
 	corner.Parent = frame
 end
 
-if getgenv().espConnections then
-	for _, connection in pairs(getgenv().espConnections) do
-		connection:Disconnect()
-	end
-end
-getgenv().espConnections = {}
-
-getgenv().espConnections[0] = localPlayer.CharacterAdded:Connect(function()
+local Connections = {}
+Connections[0] = localPlayer.CharacterAdded:Connect(function()
 	teammates = {}
 	enemies = {}
 
@@ -65,7 +59,7 @@ getgenv().espConnections[0] = localPlayer.CharacterAdded:Connect(function()
 	end
 end)
 
-getgenv().espConnections[1] = Run.Heartbeat:Connect(function()
+Connections[1] = Run.Heartbeat:Connect(function()
 	if not localPlayer:GetAttribute("Match") then
 		return
 	end
@@ -120,3 +114,5 @@ getgenv().espConnections[1] = Run.Heartbeat:Connect(function()
 		end
 	end
 end)
+
+return Connections
