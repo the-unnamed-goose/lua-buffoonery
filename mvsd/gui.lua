@@ -1,6 +1,6 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "http://localhost:8000/"
+local Repository = "https://api.bitbucket.org/2.0/repositories/lua-buffoonery/scripts/src/master/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
