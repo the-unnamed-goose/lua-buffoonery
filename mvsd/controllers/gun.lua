@@ -47,12 +47,14 @@ local function shootGun(tool, targetPosition)
 	getgenv().controller.lock.gun = true
 
 	if not canShoot(tool) then
+		getgenv().controller.lock.gun = false
 		return
 	end
 
 	local muzzleAttachment = tool:FindFirstChild(MUZZLE_ATTACHMENT_NAME, true)
 	if not muzzleAttachment then
 		warn("Muzzle attachment not found for gun: " .. tool.Name)
+		getgenv().controller.lock.gun = false
 		return
 	end
 
@@ -66,6 +68,7 @@ local function shootGun(tool, targetPosition)
 		WeaponRaycast(currentCamera.CFrame.Position, targetPosition, nil, CollisionGroups.SCREEN_RAYCAST)
 	local characterOrigin = CharacterRayOrigin(character)
 	if not characterOrigin then
+		getgenv().controller.lock.gun = false
 		return
 	end
 

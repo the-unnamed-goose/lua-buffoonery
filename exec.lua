@@ -52,7 +52,7 @@ local function connect()
 	if socket and socket.Connected then
 		return
 	end
-	
+
 	local success, newSocket = pcall(WebSocket.connect, config.address)
 	if success and newSocket and active then
 		setSocket(newSocket)
@@ -90,8 +90,8 @@ setStore("Disconnect", disconnect)
 
 task.spawn(function()
 	while active do
-	  if not socket then
-		  connect()
+		if not socket then
+			connect()
 		end
 		waitInterval(config.reconnectInterval)
 	end

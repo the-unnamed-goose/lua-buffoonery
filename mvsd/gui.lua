@@ -1,6 +1,6 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://api.bitbucket.org/2.0/repositories/lua-buffoonery/scripts/src/master/"
+local Repository = "http://localhost:8000/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
@@ -107,7 +107,7 @@ local aimToggle = Aim:Toggle({
 			for _, connection in pairs(module) do
 				connection:Disconnect()
 			end
-			module = nil
+			modules["mvsd/aimbot.lua"] = nil
 			return
 		end
 		loadModule("mvsd/aimbot.lua")
@@ -255,7 +255,7 @@ local espToggle = Esp:Toggle({
 			for _, connection in pairs(module) do
 				connection:Disconnect()
 			end
-			module = nil
+			modules["mvsd/esp.lua"] = nil
 			return
 		end
 		return loadModule("mvsd/esp.lua")
@@ -293,10 +293,8 @@ local renewerSystem = Controls:Toggle({
 	Callback = function(state)
 		local module = modules["mvsd/controllers/init.lua"]
 		if not state and module then
-			for _, connection in pairs(module) do
-				connection:Disconnect()
-			end
-			module = nil
+			module:Disconnect()
+			modules["mvsd/controllers/init.lua"] = nil
 			return
 		end
 		loadModule("mvsd/controllers/init.lua")
@@ -310,10 +308,8 @@ local knifeController = Controls:Toggle({
 	Callback = function(state)
 		local module = modules["mvsd/controllers/knife.lua"]
 		if not state and module then
-			for _, connection in pairs(module) do
-				connection:Disconnect()
-			end
-			module = nil
+			module:Disconnect()
+			modules["mvsd/controllers/knife.lua"] = nil
 			return
 		end
 		loadModule("mvsd/controllers/knife.lua")
@@ -327,10 +323,8 @@ local gunController = Controls:Toggle({
 	Callback = function(state)
 		local module = modules["mvsd/controllers/gun.lua"]
 		if not state and module then
-			for _, connection in pairs(module) do
-				connection:Disconnect()
-			end
-			module = nil
+			module:Disconnect()
+			modules["mvsd/controllers/gun.lua"] = nil
 			return
 		end
 		loadModule("mvsd/controllers/gun.lua")

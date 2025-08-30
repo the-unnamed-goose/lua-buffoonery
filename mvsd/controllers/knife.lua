@@ -2,6 +2,7 @@
 local Replicated = game:GetService("ReplicatedStorage")
 local Input = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
 local ContextActionService = game:GetService("ContextActionService")
 local CollectionService = game:GetService("CollectionService")
 
@@ -23,45 +24,49 @@ local KNIFE_HANDLE_NAME = "RightHandle"
 
 local currentCamera = workspace.CurrentCamera
 local player = Players.LocalPlayer
-local character = player.Character
-local humanoid = character:WaitForChild("Humanoid")
-local animator = humanoid:WaitForChild("Animator")
 local mouse = player:GetMouse()
-local playerGui = player.PlayerGui
 
 local throwAnimation = Replicated.Animations.Throw
-local touchControlsGui = Replicated.Gui.KnifeTouchControls:Clone()
-local throwButton = touchControlsGui.ThrowButton
-local modeLabel = throwButton.Mode
-
 local throwStartRemote = Replicated.Remotes.ThrowStart
 local throwHitRemote = Replicated.Remotes.ThrowHit
 local stabRemote = Replicated.Remotes.Stab
 
-local isStabMode = true
+local character
+local isStabMode = false
 local currentThrowPromise = nil
 local currentTool = nil
 local maid = Maid.new()
 
-touchControlsGui.Parent = playerGui
 local hasMouseEnabled = Input.MouseEnabled
-local hasTouchEnabled = Input.TouchEnabled and not Input.MouseEnabled
 
-if hasTouchEnabled then
-	spawn(function()
-		local jumpButton =
-			playerGui:WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+-- Find the existing UI controls
+local function getKnifeControls()
+	local controls = StarterGui:FindFirstChild("Controls")
+	if not controls then
+		return nil
+	end
 
-		local function calibrateControls()
-			local buttonHeight = jumpButton.AbsoluteSize.Y
-			throwButton.Size = UDim2.new(0, jumpButton.AbsoluteSize.X * 0.9, 0, buttonHeight * 0.9)
-			throwButton.Position =
-				UDim2.new(0, jumpButton.AbsolutePosition.X - 30, 0, jumpButton.AbsolutePosition.Y + buttonHeight - 30)
-		end
+	local knifeControl = controls:FindFirstChild("KnifeControl")
+	if not knifeControl then
+		return nil
+	end
 
-		calibrateControls()
-		jumpButton.Changed:Connect(calibrateControls)
-	end)
+	return knifeControl
+end
+
+local function getControlButtons()
+	local knifeControl = getKnifeControls()
+	if not knifeControl then
+		return nil, nil, nil, nil
+	end
+
+	local pcControls = knifeControl:FindFirstChild("PC")
+	local gamepadControls = knifeControl:FindFirstChild("Gamepad")
+
+	local throwButton = pcControls and pcControls:FindFirstChild("Throw")
+	local stabButton = pcControls and pcControls:FindFirstChild("Stab")
+
+	return throwButton, stabButton, pcControls, gamepadControls
 end
 
 local function getThrowDirection(targetPosition, hrpPosition)
@@ -146,6 +151,12 @@ local function throwKnife(tool, targetPosition, isManualActivation)
 	end
 
 	if not hasMouseEnabled then
+		local humanoid = character and character:FindFirstChild("Humanoid")
+		local animator = humanoid and humanoid:FindFirstChild("Animator")
+		if not animator then
+			return
+		end
+
 		local throwAnimationTrack = animator:LoadAnimation(throwAnimation)
 
 		currentThrowPromise = Promise.new(function(resolve, reject, onCancel)
@@ -223,9 +234,14 @@ local function handleStabInput(tool)
 	end)
 end
 
-local chargeAnimationTrack = animator:LoadAnimation(throwAnimation)
 local function handleMouseThrowInput(tool)
-	getgenv().controller.lock.knife = true
+	local humanoid = character and character:FindFirstChild("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChild("Animator")
+	if not animator then
+		return
+	end
+
+	local chargeAnimationTrack = animator:LoadAnimation(throwAnimation)
 	local isCharged = false
 	local chargePromise = nil
 
@@ -290,19 +306,52 @@ local function handleMouseThrowInput(tool)
 		chargeAnimationTrack:Stop()
 		setKnifeHandleTransparency(tool, 0)
 	end)
-	getgenv().controller.lock.knife = false
+end
+
+local function setupUIConnections(tool)
+	local throwButton, stabButton, pcControls, gamepadControls = getControlButtons()
+
+	if throwButton then
+		print("Found throw button, connecting...")
+		maid:GiveTask(throwButton.MouseButton1Click:Connect(function()
+			print("Throw button clicked!")
+			throwKnife(tool, mouse.Hit.Position, true)
+		end))
+	end
+
+	if stabButton then
+		print("Found stab button, connecting...")
+		maid:GiveTask(stabButton.MouseButton1Click:Connect(function()
+			print("Stab button clicked!")
+			tool:Activate()
+		end))
+	end
+
+	-- Also connect gamepad buttons if they exist
+	if gamepadControls then
+		local gamepadThrow = gamepadControls:FindFirstChild("Throw")
+		local gamepadStab = gamepadControls:FindFirstChild("Stab")
+
+		if gamepadThrow then
+			maid:GiveTask(gamepadThrow.MouseButton1Click:Connect(function()
+				throwKnife(tool, mouse.Hit.Position, true)
+			end))
+		end
+
+		if gamepadStab then
+			maid:GiveTask(gamepadStab.MouseButton1Click:Connect(function()
+				tool:Activate()
+			end))
+		end
+	end
 end
 
 local function handleThrowInput(tool)
-	getgenv().controller.lock.knife = true
-	maid:GiveTask(throwButton.MouseButton1Down:Connect(function()
-		isStabMode = not isStabMode
-		modeLabel.Text = isStabMode and "Throw Mode" or "Stab Mode"
-
-		tool.ManualActivationOnly = not isStabMode
-	end))
+	-- Connect to existing UI buttons
+	setupUIConnections(tool)
 
 	if hasMouseEnabled and Input.MouseEnabled then
+		tool.ManualActivationOnly = true
 		handleMouseThrowInput(tool)
 	else
 		ContextActionService:BindAction("Throw", function(actionName, inputState)
@@ -332,19 +381,16 @@ local function handleThrowInput(tool)
 			throwKnife(tool, worldPosition)
 		end
 	end))
-	getgenv().controller.lock.knife = false
 end
 
 local function onKnifeEquipped(tool)
+	print("Knife equipped, setting up controls...")
 	maid:DoCleaning()
 	currentTool = tool
 
-	tool.ManualActivationOnly = not isStabMode
-	touchControlsGui.Enabled = hasTouchEnabled
-	modeLabel.Text = isStabMode and "Throw Mode" or "Stab Mode"
+	tool.ManualActivationOnly = isStabMode
 
 	maid:GiveTask(function()
-		touchControlsGui.Enabled = false
 		currentTool = nil
 	end)
 
@@ -358,24 +404,20 @@ local function onKnifeEquipped(tool)
 	end))
 end
 
-local characterConnection
 return player.CharacterAdded:Connect(function(new)
 	character = new
-	humanoid = character:WaitForChild("Humanoid")
-	animator = humanoid:WaitForChild("Animator")
+	print("Character spawned, waiting for knife tools...")
 
-	if characterConnection then
-		characterConnection:Disconnect()
-	end
-
-	characterConnection = character.ChildAdded:Connect(function(child)
+	character.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.KNIFE_TOOL) then
+			print("Knife tool detected:", child.Name)
 			onKnifeEquipped(child)
 		end
 	end)
 
 	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.GUN_TOOL) then
+		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.KNIFE_TOOL) then
+			print("Existing knife tool found:", child.Name)
 			onKnifeEquipped(child)
 		end
 	end
