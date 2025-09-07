@@ -6,7 +6,7 @@ local Workspace = game:GetService("Workspace")
 
 local throwStartRemote = Replicated.Remotes:WaitForChild("ThrowStart")
 local throwHitRemote = Replicated.Remotes:WaitForChild("ThrowHit")
-local shootRemote = ReplicatedStorage.Remotes:WaitForChild("ShootGun")
+local shootRemote = Replicated.Remotes:WaitForChild("ShootGun")
 local WEAPON_TYPE = { gun = "Gun_Equip", knife = "Knife_Equip" }
 
 -- Uncomment this paragraph if you want to use the script standalone
@@ -16,6 +16,22 @@ local WEAPON_TYPE = { gun = "Gun_Equip", knife = "Knife_Equip" }
 local localPlayer = Players.LocalPlayer
 local lock = { gun = false, knife = false }
 local enemyCache = {}
+
+function updateCache()
+	enemyCache = {}
+	for _, enemy in pairs(Players:GetPlayers()) do
+		task.spawn(function()
+			if enemy and enemy ~= localPlayer and enemy.Team and enemy.Team ~= localPlayer.Team then
+				if enemy.Character and enemy.Character.Parent == Workspace then
+					local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
+					if targetPart then
+						enemyCache[enemy] = targetPart
+					end
+				end
+			end
+		end)
+	end
+end
 
 local function equipWeapon(weaponType)
 	local backpack = localPlayer.Backpack
@@ -46,12 +62,14 @@ local function killAllKnife()
 	end
 
 	for _, part in pairs(enemyCache) do
-		if part then
-			local origin = humanoidRootPart.Position
-			local direction = (part.Position - origin).Unit
-			throwStartRemote:FireServer(origin, direction)
-			throwHitRemote:FireServer(part, part.Position)
-		end
+		task.spawn(function()
+			if part then
+				local origin = humanoidRootPart.Position
+				local direction = (part.Position - origin).Unit
+				throwStartRemote:FireServer(origin, direction)
+				throwHitRemote:FireServer(part, part.Position)
+			end
+		end)
 	end
 end
 
@@ -64,10 +82,16 @@ local function killAllGun()
 	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 
 	for _, part in pairs(enemyCache) do
-		if part then
-			shootRemote:FireServer(humanoidRootPart.Position, part.Position, part, part.Position)
-		end
+		task.spawn(function()
+			if part then
+				shootRemote:FireServer(humanoidRootPart.Position, part.Position, part, part.Position)
+			end
+		end)
 	end
+end
+
+if localPlayer.Character then
+	updateCache()
 end
 
 local Connections = {}
@@ -85,19 +109,7 @@ Connections[0] = Run.Heartbeat:Connect(function()
 	end
 end)
 
-Connections[1] = Run.Heartbeat:Connect(function()
-	enemyCache = {}
-	for _, enemy in pairs(Players:GetPlayers()) do
-		if enemy and enemy ~= localPlayer and enemy.Team and enemy.Team ~= localPlayer.Team then
-			if enemy.Character and enemy.Character.Parent == Workspace then
-				local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
-				if targetPart then
-					enemyCache[enemy] = targetPart
-				end
-			end
-		end
-	end
-end)
+Connections[1] = Run.Heartbeat:Connect(updateCache)
 
 Connections[2] = Run.RenderStepped:Connect(function()
 	if getgenv().killLoop.gun and not lock.gun then

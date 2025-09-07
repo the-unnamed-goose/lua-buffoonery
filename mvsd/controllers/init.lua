@@ -6,12 +6,16 @@ function init()
 	if playerModel then
 		local gun = playerModel:WaitForChild("GunController")
 		if gun then
-			gun:Destroy()
+			pcall(function()
+				gun:Destroy()
+			end)
 		end
 
 		local knife = playerModel:WaitForChild("KnifeController")
 		if knife then
-			knife:Destroy()
+			pcall(function()
+				knife:Destroy()
+			end)
 		end
 	end
 end

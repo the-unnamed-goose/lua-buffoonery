@@ -561,9 +561,8 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 	local gunReady = gunAvailable
 		and not getgenv().controller.lock.gun
 		and (
-			tick() - getgenv().controller.gunCooldown >= (
-				(gunEquipped or gunInBackpack):GetAttribute("Cooldown") or 2.5
-			)
+			tick() - getgenv().controller.gunCooldown
+			>= ((gunEquipped or gunInBackpack):GetAttribute("Cooldown") or 2.5)
 		)
 
 	local knifeEquipped = getWeapon(WEAPON_TYPE.KNIFE)
@@ -683,6 +682,10 @@ local function handleCombat()
 			end
 		end
 	end
+end
+
+if player.Character then
+	initializePlayer()
 end
 
 local Connections = {}

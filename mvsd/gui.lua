@@ -1,6 +1,7 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://api.bitbucket.org/2.0/repositories/lua-buffoonery/scripts/src/master/"
+--local Repository = "https://api.bitbucket.org/2.0/repositories/lua-buffoonery/scripts/src/master/"
+local Repository = "http://localhost:8000/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
@@ -13,7 +14,7 @@ getgenv().aimConfig = {
 	NATIVE_UI = true,
 	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
-	AIM_DEVIATION = 10,
+	AIM_DEVIATION = 12,
 	RAYCAST_DISTANCE = 1000,
 }
 getgenv().espTeamMates = true
@@ -191,7 +192,7 @@ local reactionSlider = Aim:Slider({
 	Step = 0.01,
 	Value = {
 		Min = 0,
-		Max = 10,
+		Max = 1,
 		Default = 0.17,
 	},
 	Callback = function(value)
@@ -202,10 +203,10 @@ local reactionSlider = Aim:Slider({
 local actionSlider = Aim:Slider({
 	Title = "Action Time",
 	Desc = "The amount of time the script will wait after switching or equipping a weapon before attacking a given target, is not applied when 'Switch Weapons' is not toggled",
-	Step = 0.01,
+	Step = 0.1,
 	Value = {
 		Min = 0.2,
-		Max = 10,
+		Max = 4,
 		Default = 0.3,
 	},
 	Callback = function(value)
@@ -219,7 +220,7 @@ local predictionSlider = Aim:Slider({
 	Step = 0.01,
 	Value = {
 		Min = 0.01,
-		Max = 1,
+		Max = 0.1,
 		Default = 0.08,
 	},
 	Callback = function(value)
@@ -233,7 +234,7 @@ local deviationAmountSlider = Aim:Slider({
 	Value = {
 		Min = 1,
 		Max = 20,
-		Default = 10,
+		Default = 12,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.AIM_DEVIATION = value
@@ -312,6 +313,12 @@ local knifeController = Controls:Toggle({
 			modules["mvsd/controllers/knife.lua"] = nil
 			return
 		end
+		Windui:Notify({
+			Title = "Warning",
+			Content = "The custom knife controller has no mode toggle functionality (button) on mobile.",
+			Duration = 4,
+			Icon = "triangle-alert",
+		})
 		loadModule("mvsd/controllers/knife.lua")
 	end,
 })
@@ -360,6 +367,13 @@ knifeToggle = Kill:Toggle({
 	Desc = "Repeatedly kills all players using the knife",
 	Callback = function(state)
 		if state then
+			local module = modules["mvsd/killall.lua"]
+			if not module then
+				module:Disconnect()
+				modules["mvsd/killall.lua"] = nil
+				return
+			end
+
 			lockToggle("knife")
 		else
 			lockToggle()
@@ -374,6 +388,13 @@ gunToggle = Kill:Toggle({
 	Desc = "Repeatedly kills all players using the gun",
 	Callback = function(state)
 		if state then
+			local module = modules["mvsd/killall.lua"]
+			if not module then
+				module:Disconnect()
+				modules["mvsd/killall.lua"] = nil
+				return
+			end
+
 			lockToggle("gun")
 		else
 			lockToggle()
@@ -384,15 +405,20 @@ gunToggle = Kill:Toggle({
 })
 
 registerConfig(defaultConfig)
+if defaultConfig then
+	Windui:Notify({
+		Title = "Warning",
+		Content = "The WindUI library doesn't properly implement a configuration manager, you are going to receive a very buggy experience if you use this feature.",
+		Duration = 8,
+		Icon = "triangle-alert",
+	})
+	defaultConfig:Load()
+end
 local Configs = Window:Tab({
 	Title = "Config",
 	Icon = "cog",
 	Locked = false,
 })
-
-if defaultConfig then
-	defaultConfig:Load()
-end
 
 Configs:Input({
 	Title = "Config Name",
@@ -470,6 +496,13 @@ local Load = Configs:Button({
 			return
 		end
 
+		Windui:Notify({
+			Title = "Warning",
+			Content = "The WindUI library doesn't properly implement a configuration manager, you are going to receive a very buggy experience if you use this feature.",
+			Duration = 8,
+			Icon = "triangle-alert",
+		})
+
 		local loadConfig = Config:CreateConfig(saveName)
 		registerConfig(loadConfig)
 
@@ -493,21 +526,12 @@ local Credits = Window:Tab({
 
 local gooseCredit = Credits:Paragraph({
 	Title = "Goose",
-	Desc = "The script developer, rewrote everything from scratch",
+	Desc = "The script developer, rewrote everything from scratch, if you encounter any issues please report them at https://github.com/agnusbugner/lua-buffoonery/issues",
 })
 
-local nyxCredit = Credits:Paragraph({
-	Title = "Nyx",
-	Desc = "The guy behind Evelynn Hub, motivated me by committing crimes against humanity",
-	Buttons = {
-		{
-			Icon = "message-circle-dashed",
-			Title = "Join His Discord",
-			Callback = function()
-				setclipboard("https://discord.gg/GU64Aenm8D")
-			end,
-		},
-	},
+local footagesusCredit = Credits:Paragraph({
+	Title = "Footagesus",
+	Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox. He's also the reason why the configs don't work XD",
 })
 
 Window:SelectTab(1)
