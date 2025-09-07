@@ -1,6 +1,6 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://raw.githubusercontent.com/agnusbugner/lua-buffoonery/refs/heads/master/"
+local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
@@ -525,7 +525,7 @@ local Credits = Window:Tab({
 
 local gooseCredit = Credits:Paragraph({
 	Title = "Goose",
-	Desc = "The script developer, rewrote everything from scratch, if you encounter any issues please report them at https://github.com/agnusbugner/lua-buffoonery/issues",
+	Desc = "The script developer, rewrote everything from scratch, if you encounter any issues please report them at https://github.com/goose-birb/lua-buffoonery/issues",
 })
 
 local footagesusCredit = Credits:Paragraph({
