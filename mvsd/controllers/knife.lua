@@ -312,17 +312,13 @@ local function setupUIConnections(tool)
 	local throwButton, stabButton, pcControls, gamepadControls = getControlButtons()
 
 	if throwButton then
-		print("Found throw button, connecting...")
 		maid:GiveTask(throwButton.MouseButton1Click:Connect(function()
-			print("Throw button clicked!")
 			throwKnife(tool, mouse.Hit.Position, true)
 		end))
 	end
 
 	if stabButton then
-		print("Found stab button, connecting...")
 		maid:GiveTask(stabButton.MouseButton1Click:Connect(function()
-			print("Stab button clicked!")
 			tool:Activate()
 		end))
 	end
@@ -384,7 +380,6 @@ local function handleThrowInput(tool)
 end
 
 local function onKnifeEquipped(tool)
-	print("Knife equipped, setting up controls...")
 	maid:DoCleaning()
 	currentTool = tool
 
@@ -406,18 +401,15 @@ end
 
 return player.CharacterAdded:Connect(function(new)
 	character = new
-	print("Character spawned, waiting for knife tools...")
 
 	character.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.KNIFE_TOOL) then
-			print("Knife tool detected:", child.Name)
 			onKnifeEquipped(child)
 		end
 	end)
 
 	for _, child in ipairs(character:GetChildren()) do
 		if child:IsA("Tool") and CollectionService:HasTag(child, Tags.KNIFE_TOOL) then
-			print("Existing knife tool found:", child.Name)
 			onKnifeEquipped(child)
 		end
 	end
