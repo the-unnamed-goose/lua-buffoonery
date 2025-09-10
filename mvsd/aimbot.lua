@@ -9,12 +9,14 @@ local Run = game:GetService("RunService")
 --[[ Uncomment this paragraph if you want to use the script standalone
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
+	MAX_VELOCITY = 50,
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
 	REACTION_TIME = 0.17,
-	ACTION_TIME = 0.3,
+	ACTION_TIME = 0.32,
 	AUTO_EQUIP = true,
+	EQUIP_LOOP = 0.6,
 	NATIVE_UI = true,
 	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
@@ -57,6 +59,11 @@ local misfireRayParams = RaycastParams.new()
 misfireRayParams.IgnoreWater = true
 misfireRayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
+local deviationSeed = math.random(1, 1000000)
+local targetAcceleration = 0
+local equipTimer = 0
+local shotCount = 0
+
 local playerReferences = {}
 local function initializePlayer()
 	local char = player.Character
@@ -70,13 +77,10 @@ local function initializePlayer()
 	playerReferences = { char, hrp, animator }
 end
 
-local function isInFov(pos)
-	local toTarget = (pos - camera.CFrame.Position).Unit
-	return camera.CFrame.LookVector:Dot(toTarget) >= FOV_ANGLE
+local function normalRandom()
+	local u1, u2 = math.random(), math.random()
+	return math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
 end
-
-local deviationSeed = math.random(1, 1000000)
-local shotCount = 0
 
 local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	if not getgenv().aimConfig.DEVIATION_ENABLED then
@@ -95,19 +99,15 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	local movementSpread = 0
 	if targetChar then
 		local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+		local hrp = targetChar:FindFirstChild("HumanoidRootPart")
 		if humanoid then
-			local speed = humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed
+			local speed = humanoid.MoveDirection.Magnitude * hrp.Velocity.Magnitude
 			movementSpread = math.min(speed / 50, 1.0) * 0.5
 		end
 	end
 
 	local baseSpread = getgenv().aimConfig.AIM_DEVIATION * 0.1
 	local totalSpread = baseSpread * distanceFalloff * (1 + movementSpread)
-
-	local function normalRandom()
-		local u1, u2 = math.random(), math.random()
-		return math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
-	end
 
 	local horizontalDeviation = normalRandom() * totalSpread * math.rad(1)
 	local verticalDeviation = normalRandom() * totalSpread * math.rad(1)
@@ -171,7 +171,13 @@ local function isValidTarget(targetPlayer, localHrp)
 	local head = char:FindFirstChild("Head")
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 
-	if not hum or hum.Health <= 0 or not head or not hrp then
+	if
+		not hum
+		or hum.Health <= 0
+		or not head
+		or not hrp
+		or hrp.Velocity.Magnitude >= getgenv().aimConfig.MAX_VELOCITY
+	then
 		return false
 	end
 
@@ -180,7 +186,9 @@ local function isValidTarget(targetPlayer, localHrp)
 		return false
 	end
 
-	return not getgenv().aimConfig.FOV_CHECK or isInFov(hrp.Position)
+	local toTarget = (hrp.Position - camera.CFrame.Position).Unit
+	local isInFov = camera.CFrame.LookVector:Dot(toTarget) >= FOV_ANGLE
+	return not getgenv().aimConfig.FOV_CHECK or isInFov
 end
 
 local function getVisibleParts(targetChar, localHrp)
@@ -194,19 +202,25 @@ local function getVisibleParts(targetChar, localHrp)
 
 	for _, part in ipairs(targetChar:GetChildren()) do
 		if part:IsA("BasePart") then
-			local directionFromHRP = part.Position - localHrp.Position
+			local partPos = part.Position
+			local directionFromHRP = partPos - localHrp.Position
 			local distanceFromHRP = directionFromHRP.Magnitude
 
 			if distanceFromHRP > 0 then
 				local resultFromHRP =
 					Workspace:Raycast(localHrp.Position, directionFromHRP.Unit * distanceFromHRP, raycastParams)
 				local visibleFromHRP = not resultFromHRP
+				local _, onScreen = camera:WorldToViewportPoint(partPos)
 
 				if visibleFromHRP then
+					if getgenv().aimConfig.FOV_CHECK and not onScreen then
+						goto loop_getVisibleParts_end
+					end
+
 					if not getgenv().aimConfig.CAMERA_CAST then
 						table.insert(visibleParts, part)
 					else
-						local directionFromCamera = part.Position - cameraPos
+						local directionFromCamera = partPos - cameraPos
 						local distanceFromCamera = directionFromCamera.Magnitude
 
 						if distanceFromCamera > 0 then
@@ -223,6 +237,7 @@ local function getVisibleParts(targetChar, localHrp)
 				end
 			end
 		end
+		::loop_getVisibleParts_end::
 	end
 
 	return visibleParts
@@ -532,6 +547,11 @@ local function equipWeapon(weaponType, callback)
 end
 
 local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifePoint, localHrp, animator)
+	if tick() - equipTimer < getgenv().aimConfig.EQUIP_LOOP then
+		return
+	end
+	equipTimer = tick()
+
 	if getgenv().controller.lock.general then
 		return
 	end
@@ -643,11 +663,6 @@ local function handleCombat()
 		return
 	end
 
-	if getgenv().aimConfig.AUTO_EQUIP then
-		handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifePoint, localHrp, animator)
-		return
-	end
-
 	if getgenv().controller.lock.general then
 		return
 	end
@@ -690,6 +705,7 @@ end
 
 local Connections = {}
 Connections[0] = Run.RenderStepped:Connect(handleCombat)
-Connections[1] = player.CharacterAdded:Connect(initializePlayer)
+Connections[1] = Run.Heartbeat:Connect(handleAutoEquip)
+Connections[2] = player.CharacterAdded:Connect(initializePlayer)
 
 return Connections

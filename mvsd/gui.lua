@@ -1,15 +1,18 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+--local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+local Repository = "http://localhost:8000/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
+	MAX_VELOCITY = 50,
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
 	REACTION_TIME = 0.17,
 	ACTION_TIME = 0.3,
 	AUTO_EQUIP = true,
+	EQUIP_LOOP = 0.6,
 	NATIVE_UI = true,
 	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
@@ -78,9 +81,11 @@ function registerConfig(table)
 	table:Register("DeviationEnabled", deviationToggle)
 
 	table:Register("MaxDistance", distanceSlider)
+	table:Register("MaxVelocity", velocitySlider)
 	table:Register("VisibleParts", partsSlider)
 	table:Register("ReactionTime", reactionSlider)
 	table:Register("ActionTime", actionSlider)
+	table:Register("EquipTime", equipSlider)
 	table:Register("PredictionTime", predictionSlider)
 	table:Register("DeviationAmount", deviationAmountSlider)
 
@@ -168,7 +173,20 @@ local distanceSlider = Aim:Slider({
 		Default = 300,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.MAX_DISTANCE = value
+		getgenv().aimConfig.MAX_DISTANCE = tonumber(value)
+	end,
+})
+
+local velocitySlider = Aim:Slider({
+	Title = "Maximum velocity",
+	Desc = "The maximum target velocity at which the script will no longer attempt to shoot a target",
+	Value = {
+		Min = 0,
+		Max = 200,
+		Default = 50,
+	},
+	Callback = function(value)
+		getgenv().aimConfig.MAX_VELOCITY = tonumber(value)
 	end,
 })
 
@@ -181,7 +199,7 @@ local partsSlider = Aim:Slider({
 		Default = 4,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.VISIBLE_PARTS = value
+		getgenv().aimConfig.VISIBLE_PARTS = tonumber(value)
 	end,
 })
 
@@ -195,21 +213,35 @@ local reactionSlider = Aim:Slider({
 		Default = 0.17,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.REACTION_TIME = value
+		getgenv().aimConfig.REACTION_TIME = tonumber(value)
 	end,
 })
 
 local actionSlider = Aim:Slider({
 	Title = "Action Time",
 	Desc = "The amount of time the script will wait after switching or equipping a weapon before attacking a given target, is not applied when 'Switch Weapons' is not toggled",
-	Step = 0.1,
+	Step = 0.01,
 	Value = {
 		Min = 0.2,
 		Max = 4,
-		Default = 0.3,
+		Default = 0.32,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.ACTION_TIME = value
+		getgenv().aimConfig.ACTION_TIME = tonumber(value)
+	end,
+})
+
+local equipSlider = Aim:Slider({
+	Title = "Equip Time",
+	Desc = "The amount of time the script will wait before checking what is the best weapon to equip again.",
+	Step = 0.1,
+	Value = {
+		Min = 0.1,
+		Max = 4,
+		Default = 0.6,
+	},
+	Callback = function(value)
+		getgenv().aimConfig.EQUIP_LOOP = tonumber(value)
 	end,
 })
 
@@ -223,7 +255,7 @@ local predictionSlider = Aim:Slider({
 		Default = 0.08,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.PREDICTION_TIME = value
+		getgenv().aimConfig.PREDICTION_TIME = tonumber(value)
 	end,
 })
 
@@ -236,7 +268,7 @@ local deviationAmountSlider = Aim:Slider({
 		Default = 12,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.AIM_DEVIATION = value
+		getgenv().aimConfig.AIM_DEVIATION = tonumber(value)
 	end,
 })
 
