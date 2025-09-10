@@ -15,7 +15,7 @@ getgenv().aimConfig = {
 	NATIVE_UI = true,
 	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
-	AIM_DEVIATION = 10,
+	AIM_DEVIATION = 11,
 	RAYCAST_DISTANCE = 1000,
 }
 getgenv().espTeamMates = true
@@ -265,7 +265,7 @@ local deviationAmountSlider = Aim:Slider({
 	Value = {
 		Min = 1,
 		Max = 20,
-		Default = 10,
+		Default = 11,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.AIM_DEVIATION = tonumber(value)
