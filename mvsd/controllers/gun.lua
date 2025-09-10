@@ -11,9 +11,11 @@ local CharacterRayOrigin = require(Replicated.Modules.CharacterRayOrigin)
 local BulletRenderer = require(Replicated.Modules.BulletRenderer)
 local Tags = require(Replicated.Modules.Tags)
 
+--[[ Uncomment this paragraph if you want to use the script standalone
 getgenv().controller = {}
 getgenv().controller.lock = { gun = false, general = false }
 getgenv().controller.gunCooldown = 0
+--]]
 
 local MUZZLE_ATTACHMENT_NAME = "Muzzle"
 local FIRE_SOUND_NAME = "Fire"
@@ -116,7 +118,6 @@ end
 local function onGunEquipped(tool)
 	maid:DoCleaning()
 	currentTool = tool
-	getgenv().controller.gunCooldown = 0
 	handleGunInput(tool)
 
 	maid:GiveTask(tool.AncestryChanged:Connect(function()

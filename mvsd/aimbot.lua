@@ -212,11 +212,7 @@ local function getVisibleParts(targetChar, localHrp)
 				local visibleFromHRP = not resultFromHRP
 				local _, onScreen = camera:WorldToViewportPoint(partPos)
 
-				if visibleFromHRP then
-					if getgenv().aimConfig.FOV_CHECK and not onScreen then
-						goto loop_getVisibleParts_end
-					end
-
+				if visibleFromHRP and (not getgenv().aimConfig.FOV_CHECK or onScreen) then
 					if not getgenv().aimConfig.CAMERA_CAST then
 						table.insert(visibleParts, part)
 					else
@@ -237,7 +233,6 @@ local function getVisibleParts(targetChar, localHrp)
 				end
 			end
 		end
-		::loop_getVisibleParts_end::
 	end
 
 	return visibleParts
@@ -385,7 +380,6 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 		return
 	end
 
-	-- Revalidate target and get best visible part
 	local targetChar = hitPart and hitPart.Parent
 	if targetChar then
 		local visibleParts = getVisibleParts(targetChar, localHrp)
@@ -546,7 +540,11 @@ local function equipWeapon(weaponType, callback)
 	end
 end
 
-local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifePoint, localHrp, animator)
+local function handleAutoEquip()
+	if not getgenv().aimConfig.AUTO_EQUIP then
+		return
+	end
+
 	if tick() - equipTimer < getgenv().aimConfig.EQUIP_LOOP then
 		return
 	end
@@ -555,14 +553,17 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 	if getgenv().controller.lock.general then
 		return
 	end
-	getgenv().controller.lock.general = true
 
-	if bestTarget and bestPart and not isValidTarget(bestTarget, localHrp) then
-		getgenv().controller.lock.general = false
+	local char = player.Character
+	if not char or not char.Parent then
 		return
 	end
-	if bestKnifeTarget and bestKnifePoint and not isValidTarget(bestKnifeTarget, localHrp) then
-		getgenv().controller.lock.general = false
+
+	if
+		Collection:HasTag(char, "Invulnerable")
+		or Collection:HasTag(char, "CombatDisabled")
+		or Collection:HasTag(char, "SpeedTrail")
+	then
 		return
 	end
 
@@ -598,49 +599,18 @@ local function handleAutoEquip(bestTarget, bestPart, bestKnifeTarget, bestKnifeP
 
 	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controller.lock.knife
 
-	if gunReady then
-		if gunEquipped then
-			task.wait(getgenv().aimConfig.REACTION_TIME)
-			fireGun(bestPart.Position, bestPart, localHrp, animator)
-			getgenv().controller.lock.general = false
-		else
-			equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
-				if success and bestPart and bestPart.Parent then
-					-- Revalidate target after equip
-					if bestTarget and isValidTarget(bestTarget, localHrp) then
-						updateUIHighlight(gun)
-						fireGun(bestPart.Position, bestPart, localHrp, animator)
-					end
-				end
-				getgenv().controller.lock.general = false
-			end)
-		end
-	elseif knifeAvailable then
-		if knifeEquipped then
-			if bestKnifeTarget and bestKnifePoint and isValidTarget(bestKnifeTarget, localHrp) then
-				local targetHrp = bestKnifeTarget.Character:FindFirstChild("HumanoidRootPart")
-				if targetHrp then
-					task.wait(getgenv().aimConfig.REACTION_TIME)
-					throwKnife(bestKnifePoint, targetHrp, localHrp, animator)
-				end
+	if gunReady and not gunEquipped then
+		equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
+			if success then
+				updateUIHighlight(gun)
 			end
-			getgenv().controller.lock.general = false
-		else
-			equipWeapon(WEAPON_TYPE.KNIFE, function(success, knife)
-				if success then
-					updateUIHighlight(knife)
-					if bestKnifeTarget and bestKnifePoint and isValidTarget(bestKnifeTarget, localHrp) then
-						local targetHrp = bestKnifeTarget.Character:FindFirstChild("HumanoidRootPart")
-						if targetHrp then
-							throwKnife(bestKnifePoint, targetHrp, localHrp, animator)
-						end
-					end
-				end
-				getgenv().controller.lock.general = false
-			end)
-		end
-	else
-		getgenv().controller.lock.general = false
+		end)
+	elseif knifeAvailable and not knifeEquipped then
+		equipWeapon(WEAPON_TYPE.KNIFE, function(success, knife)
+			if success then
+				updateUIHighlight(knife)
+			end
+		end)
 	end
 end
 
@@ -660,10 +630,6 @@ local function handleCombat()
 
 	local bestTarget, bestPart, bestKnifeTarget, bestKnifePoint = findBestTarget(localHrp)
 	if not bestTarget or not bestPart then
-		return
-	end
-
-	if getgenv().controller.lock.general then
 		return
 	end
 
@@ -705,7 +671,7 @@ end
 
 local Connections = {}
 Connections[0] = Run.RenderStepped:Connect(handleCombat)
-Connections[1] = Run.Heartbeat:Connect(handleAutoEquip)
-Connections[2] = player.CharacterAdded:Connect(initializePlayer)
+Connections[1] = player.CharacterAdded:Connect(initializePlayer)
+Connections[2] = player.CharacterAdded:Connect(handleAutoEquip)
 
 return Connections

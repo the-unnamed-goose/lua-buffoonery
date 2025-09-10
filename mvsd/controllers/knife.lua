@@ -15,8 +15,10 @@ local KnifeProjectileController = require(Replicated.Modules.KnifeProjectileCont
 local Hitbox = require(Replicated.Modules.Hitbox)
 local Tags = require(Replicated.Modules.Tags)
 
+--[[ Uncomment this paragraph if you want to use the script standalone
 getgenv().controller = {}
 getgenv().controller.lock = { knife = false, general = false }
+--]]
 
 local THROW_ANIMATION_SPEED = 1.4
 local CHARGE_DELAY = 0.25

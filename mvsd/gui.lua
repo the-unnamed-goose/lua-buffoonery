@@ -1,7 +1,6 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
---local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
-local Repository = "http://localhost:8000/"
+local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 300,
@@ -16,7 +15,7 @@ getgenv().aimConfig = {
 	NATIVE_UI = true,
 	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
-	AIM_DEVIATION = 12,
+	AIM_DEVIATION = 10,
 	RAYCAST_DISTANCE = 1000,
 }
 getgenv().espTeamMates = true
@@ -262,10 +261,11 @@ local predictionSlider = Aim:Slider({
 local deviationAmountSlider = Aim:Slider({
 	Title = "Aim Deviation Amount",
 	Desc = "How bad should the misfire be, increases semi-linearly with distance and velocity.",
+	Step = 0.1,
 	Value = {
 		Min = 1,
 		Max = 20,
-		Default = 12,
+		Default = 10,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.AIM_DEVIATION = tonumber(value)
