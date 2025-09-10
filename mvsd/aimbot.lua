@@ -605,7 +605,7 @@ local function handleAutoEquip()
 				updateUIHighlight(gun)
 			end
 		end)
-	elseif knifeAvailable and not knifeEquipped then
+	elseif knifeAvailable and not knifeEquipped and not gunReady then
 		equipWeapon(WEAPON_TYPE.KNIFE, function(success, knife)
 			if success then
 				updateUIHighlight(knife)
@@ -671,7 +671,7 @@ end
 
 local Connections = {}
 Connections[0] = Run.RenderStepped:Connect(handleCombat)
-Connections[1] = player.CharacterAdded:Connect(initializePlayer)
-Connections[2] = player.CharacterAdded:Connect(handleAutoEquip)
+Connections[1] = Run.Heartbeat:Connect(handleAutoEquip)
+Connections[2] = player.CharacterAdded:Connect(initializePlayer)
 
 return Connections
