@@ -8,19 +8,22 @@ local Run = game:GetService("RunService")
 
 --[[ Uncomment this paragraph if you want to use the script standalone
 getgenv().aimConfig = {
-	MAX_DISTANCE = 300,
-	MAX_VELOCITY = 50,
+	MAX_DISTANCE = 250,
+	MAX_VELOCITY = 40,
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
-	REACTION_TIME = 0.17,
+	REACTION_TIME = 0.18,
 	ACTION_TIME = 0.32,
 	AUTO_EQUIP = true,
-	EQUIP_LOOP = 0.6,
+	EQUIP_LOOP = 0.3,
 	NATIVE_UI = true,
-	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
-	AIM_DEVIATION = 10,
+	BASE_DEVIATION = 2.05,
+	DISTANCE_FACTOR = 0.6,
+	VELOCITY_FACTOR = 0.9,
+	ACCURACY_BUILDUP = 0.14,
+	MIN_DEVIATION = 1,
 	RAYCAST_DISTANCE = 1000,
 }
 --]]
@@ -63,6 +66,8 @@ local deviationSeed = math.random(1, 1000000)
 local targetAcceleration = 0
 local equipTimer = 0
 local shotCount = 0
+local accuracyBonus = 0
+local lastShotTime = 0
 
 local playerReferences = {}
 local function initializePlayer()
@@ -89,49 +94,78 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 
 	shotCount = shotCount + 1
 	math.randomseed(deviationSeed + shotCount)
+	
+	local currentTime = tick()
+	local timeSinceLastShot = currentTime - lastShotTime
+	lastShotTime = currentTime
+	
+	if timeSinceLastShot < 2 then
+		accuracyBonus = math.min(accuracyBonus + getgenv().aimConfig.ACCURACY_BUILDUP, 1.0)
+	else
+		accuracyBonus = math.max(accuracyBonus - 0.1, 0)
+	end
 
 	local direction = (originalPos - muzzlePos).Unit
 	local distance = (originalPos - muzzlePos).Magnitude
 
-	local distanceRatio = math.min(distance / getgenv().aimConfig.MAX_DISTANCE, 1.0)
-	local distanceFalloff = 1 + (distanceRatio * distanceRatio * 2)
+	if distance <= 0 then
+		return originalPos, nil
+	end
 
-	local movementSpread = 0
+	local distanceFactor = (distance / getgenv().aimConfig.MAX_DISTANCE) * getgenv().aimConfig.DISTANCE_FACTOR
+	
+	local velocityFactor = 0
 	if targetChar then
 		local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
 		local hrp = targetChar:FindFirstChild("HumanoidRootPart")
-		if humanoid then
-			local speed = humanoid.MoveDirection.Magnitude * hrp.Velocity.Magnitude
-			movementSpread = math.min(speed / 50, 1.0) * 0.5
+		if humanoid and hrp then
+			local horizontalVelocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z).Magnitude
+			velocityFactor = (horizontalVelocity / getgenv().aimConfig.MAX_VELOCITY) * getgenv().aimConfig.VELOCITY_FACTOR
 		end
 	end
 
-	local baseSpread = getgenv().aimConfig.AIM_DEVIATION * 0.1
-	local totalSpread = baseSpread * distanceFalloff * (1 + movementSpread)
+	local baseDeviation = getgenv().aimConfig.BASE_DEVIATION
+	local totalDeviation = baseDeviation + distanceFactor + velocityFactor - accuracyBonus
+	totalDeviation = math.max(totalDeviation, getgenv().aimConfig.MIN_DEVIATION)
 
-	local horizontalDeviation = normalRandom() * totalSpread * math.rad(1)
-	local verticalDeviation = normalRandom() * totalSpread * math.rad(1)
+	local maxDeviationRadians = math.rad(totalDeviation)
+	local horizontalDeviation = normalRandom() * maxDeviationRadians * 0.6
+	local verticalDeviation = normalRandom() * maxDeviationRadians * 0.4
 
 	local right = Vector3.new(-direction.Z, 0, direction.X)
 	if right.Magnitude < 0.001 then
 		right = Vector3.new(1, 0, 0)
+		if math.abs(direction.X) > 0.9 then
+			right = Vector3.new(0, 0, 1)
+		end
 	else
 		right = right.Unit
 	end
 	local up = direction:Cross(right).Unit
 
-	local deviatedDirection = (direction + right * math.tan(horizontalDeviation) + up * math.tan(verticalDeviation)).Unit
+	local cosH, sinH = math.cos(horizontalDeviation), math.sin(horizontalDeviation)
+	local cosV, sinV = math.cos(verticalDeviation), math.sin(verticalDeviation)
+	
+	local tempDir = direction * cosH + right * sinH
+	local deviatedDirection = (tempDir * cosV + up * sinV).Unit
 
-	misfireRayParams.FilterDescendantsInstances = { player.Character }
-	local rayResult =
-		Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.RAYCAST_DISTANCE, misfireRayParams)
+	local safeFilterList = {}
+	if player.Character and player.Character.Parent then
+		table.insert(safeFilterList, player.Character)
+	end
+	
+	misfireRayParams.FilterDescendantsInstances = safeFilterList
+	
+	local rayResult = Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.RAYCAST_DISTANCE, misfireRayParams)
 
-	if shotCount % 10 == 0 then
-		math.randomseed(tick())
+	if shotCount >= 1000 then
+		shotCount = 0
+		deviationSeed = math.random(1, 1000000)
 	end
 
 	return rayResult and rayResult.Position or originalPos, rayResult and rayResult.Instance
 end
+
 
 local function predictTargetPoint(targetHrp)
 	local currentPos = targetHrp.Position
@@ -599,7 +633,6 @@ local function handleAutoEquip()
 
 	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controller.lock.knife
 
-  wait(getgenv().aimConfig.ACTION_TIME)
 	if gunReady and not gunEquipped then
 		equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
 			if success then
@@ -626,6 +659,7 @@ local function handleCombat()
 		or Collection:HasTag(char, "CombatDisabled")
 		or Collection:HasTag(char, "SpeedTrail")
 	then
+	  char:FindFirstChildOfClass("Humanoid"):UnequipTools()
 		return
 	end
 

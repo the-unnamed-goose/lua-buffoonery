@@ -3,19 +3,22 @@ local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
 
 getgenv().aimConfig = {
-	MAX_DISTANCE = 300,
-	MAX_VELOCITY = 50,
+	MAX_DISTANCE = 250,
+	MAX_VELOCITY = 40,
 	VISIBLE_PARTS = 4,
 	CAMERA_CAST = true,
 	FOV_CHECK = true,
-	REACTION_TIME = 0.17,
+	REACTION_TIME = 0.18,
 	ACTION_TIME = 0.3,
 	AUTO_EQUIP = true,
-	EQUIP_LOOP = 0.6,
+	EQUIP_LOOP = 0.3,
 	NATIVE_UI = true,
-	PREDICTION_TIME = 0.08,
 	DEVIATION_ENABLED = true,
-	AIM_DEVIATION = 11,
+	BASE_DEVIATION = 2.05,
+	DISTANCE_FACTOR = 0.6,
+	VELOCITY_FACTOR = 0.9,
+	ACCURACY_BUILDUP = 0.14,
+	MIN_DEVIATION = 1,
 	RAYCAST_DISTANCE = 1000,
 }
 getgenv().espTeamMates = true
@@ -28,7 +31,7 @@ local Window = Windui:CreateWindow({
 	Icon = "square-function",
 	Author = "by Le Honk",
 	Folder = "MVSD_Graphics",
-	Size = UDim2.fromOffset(260, 280),
+	Size = UDim2.fromOffset(260, 300),
 	Transparent = true,
 	Theme = "Dark",
 	Resizable = true,
@@ -85,8 +88,11 @@ function registerConfig(table)
 	table:Register("ReactionTime", reactionSlider)
 	table:Register("ActionTime", actionSlider)
 	table:Register("EquipTime", equipSlider)
-	table:Register("PredictionTime", predictionSlider)
-	table:Register("DeviationAmount", deviationAmountSlider)
+	table:Register("BaseDeviation", baseDeviationSlider)
+	table:Register("DistanceFactor", distanceFactorSlider)
+	table:Register("VelocityFactor", velocityFactorSlider)
+	table:Register("AccuracyBuildup", accuracyBuildupSlider)
+	table:Register("MinDeviation", minDeviationSlider)
 
 	table:Register("ESPEnabled", espToggle)
 	table:Register("ESPTeam", teamToggle)
@@ -169,7 +175,7 @@ local distanceSlider = Aim:Slider({
 	Value = {
 		Min = 50,
 		Max = 1000,
-		Default = 300,
+		Default = 250,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_DISTANCE = tonumber(value)
@@ -180,9 +186,9 @@ local velocitySlider = Aim:Slider({
 	Title = "Maximum velocity",
 	Desc = "The maximum target velocity at which the script will no longer attempt to shoot a target",
 	Value = {
-		Min = 0,
+		Min = 20,
 		Max = 200,
-		Default = 50,
+		Default = 40,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_VELOCITY = tonumber(value)
@@ -207,9 +213,9 @@ local reactionSlider = Aim:Slider({
 	Desc = "The amount of time the script will wait before attacking a given target, is not applied when 'Switch Weapons' is toggled",
 	Step = 0.01,
 	Value = {
-		Min = 0,
+		Min = 0.01,
 		Max = 1,
-		Default = 0.17,
+		Default = 0.18,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.REACTION_TIME = tonumber(value)
@@ -237,38 +243,80 @@ local equipSlider = Aim:Slider({
 	Value = {
 		Min = 0.1,
 		Max = 4,
-		Default = 0.6,
+		Default = 0.3,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.EQUIP_LOOP = tonumber(value)
 	end,
 })
 
-local predictionSlider = Aim:Slider({
-	Title = "Prediction Time",
-	Desc = "How far ahead the script will predict the target location when throwing knives at them.",
-	Step = 0.01,
+local baseDeviationSlider = Aim:Slider({
+	Title = "Base Deviation",
+	Desc = "Base aim inaccuracy in degrees, controls how much the aim naturally deviates",
+	Step = 0.1,
 	Value = {
-		Min = 0.01,
-		Max = 0.1,
-		Default = 0.08,
+		Min = 0.5,
+		Max = 5,
+		Default = 2.05,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.PREDICTION_TIME = tonumber(value)
+		getgenv().aimConfig.BASE_DEVIATION = tonumber(value)
 	end,
 })
 
-local deviationAmountSlider = Aim:Slider({
-	Title = "Aim Deviation Amount",
-	Desc = "How bad should the misfire be, increases semi-linearly with distance and velocity.",
+local distanceFactorSlider = Aim:Slider({
+	Title = "Distance Factor",
+	Desc = "Additional deviation penalty for distance - higher values make long shots less accurate",
 	Step = 0.1,
 	Value = {
-		Min = 1,
-		Max = 20,
-		Default = 11,
+		Min = 0,
+		Max = 2,
+		Default = 0.6,
 	},
 	Callback = function(value)
-		getgenv().aimConfig.AIM_DEVIATION = tonumber(value)
+		getgenv().aimConfig.DISTANCE_FACTOR = tonumber(value)
+	end,
+})
+
+local velocityFactorSlider = Aim:Slider({
+	Title = "Velocity Factor", 
+	Desc = "Additional deviation penalty for moving targets - higher values make moving targets harder to hit",
+	Step = 0.1,
+	Value = {
+		Min = 0,
+		Max = 2,
+		Default = 0.9,
+	},
+	Callback = function(value)
+		getgenv().aimConfig.VELOCITY_FACTOR = tonumber(value)
+	end,
+})
+
+local accuracyBuildupSlider = Aim:Slider({
+	Title = "Accuracy Buildup",
+	Desc = "How much accuracy improves with consecutive shots - higher values = faster improvement",
+	Step = 0.01,
+	Value = {
+		Min = 0,
+		Max = 0.5,
+		Default = 0.13,
+	},
+	Callback = function(value)
+		getgenv().aimConfig.ACCURACY_BUILDUP = tonumber(value)
+	end,
+})
+
+local minDeviationSlider = Aim:Slider({
+	Title = "Min Deviation",
+	Desc = "Minimum deviation that always remains - prevents perfect accuracy",
+	Step = 0.1,
+	Value = {
+		Min = 0.1,
+		Max = 3,
+		Default = 1,
+	},
+	Callback = function(value)
+		getgenv().aimConfig.MIN_DEVIATION = tonumber(value)
 	end,
 })
 
