@@ -599,6 +599,7 @@ local function handleAutoEquip()
 
 	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controller.lock.knife
 
+  wait(getgenv().aimConfig.ACTION_TIME)
 	if gunReady and not gunEquipped then
 		equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
 			if success then
