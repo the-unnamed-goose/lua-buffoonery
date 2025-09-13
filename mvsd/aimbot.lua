@@ -69,17 +69,19 @@ local shotCount = 0
 local accuracyBonus = 0
 local lastShotTime = 0
 
-local playerReferences = {}
+local playerCache = {}
 local function initializePlayer()
 	local char = player.Character
 	if not char or not char.Parent then
+		playerCache = {}
 		return
 	end
 
 	local hrp = char:WaitForChild("HumanoidRootPart")
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum and hum:WaitForChild("Animator")
-	playerReferences = { char, hrp, animator }
+	
+	playerCache = { char, hrp, hum, animator }
 end
 
 local function normalRandom()
@@ -150,8 +152,8 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	local deviatedDirection = (tempDir * cosV + up * sinV).Unit
 
 	local safeFilterList = {}
-	if player.Character and player.Character.Parent then
-		table.insert(safeFilterList, player.Character)
+	if playerCache[1] and playerCache[1].Parent then
+		table.insert(safeFilterList, playerCache[1])
 	end
 	
 	misfireRayParams.FilterDescendantsInstances = safeFilterList
@@ -171,7 +173,7 @@ local function predictTargetPoint(targetHrp)
 	local currentPos = targetHrp.Position
 	local rayOrigin = Vector3.new(currentPos.X, currentPos.Y + 15, currentPos.Z)
 
-	groundRayParams.FilterDescendantsInstances = { targetHrp.Parent, player.Character }
+	groundRayParams.FilterDescendantsInstances = { targetHrp.Parent, playerCache[1] }
 	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -80, 0), groundRayParams)
 
 	if rayResult then
@@ -226,13 +228,13 @@ local function isValidTarget(targetPlayer, localHrp)
 end
 
 local function getVisibleParts(targetChar, localHrp)
-	if not targetChar.Parent or not player.Character or not player.Character.Parent then
+	if not targetChar.Parent or not playerCache[1] or not playerCache[1].Parent then
 		return {}
 	end
 
 	local visibleParts = {}
 	local cameraPos = camera.CFrame.Position
-	raycastParams.FilterDescendantsInstances = { player.Character, targetChar }
+	raycastParams.FilterDescendantsInstances = { playerCache[1], targetChar }
 
 	for _, part in ipairs(targetChar:GetChildren()) do
 		if part:IsA("BasePart") then
@@ -273,12 +275,11 @@ local function getVisibleParts(targetChar, localHrp)
 end
 
 local function getWeapon(weaponType)
-	local char = player.Character
-	if not char or not char.Parent then
+	if not playerCache[1] or not playerCache[1].Parent then
 		return
 	end
 
-	for _, tool in ipairs(char:GetChildren()) do
+	for _, tool in ipairs(playerCache[1]:GetChildren()) do
 		if tool:IsA("Tool") and (not weaponType or tool:GetAttribute("EquipAnimation") == weaponType) then
 			return tool
 		end
@@ -485,7 +486,7 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 		KnifeProjectile = handle:Clone(),
 		Direction = direction,
 		Origin = localHrp.Position,
-		IgnoreCharacter = player.Character,
+		IgnoreCharacter = playerCache[1],
 	}, function(result)
 		if result and result.Instance then
 			throwHitRemote:FireServer(result.Instance, result.Position)
@@ -496,15 +497,14 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 end
 
 local function equipWeapon(weaponType, callback)
-	local char = player.Character
-	if not char then
+	if not playerCache[1] then
 		if callback then
 			callback(false, "No character")
 		end
 		return
 	end
 
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local humanoid = playerCache[3]
 	if not humanoid then
 		if callback then
 			callback(false, "No humanoid")
@@ -539,9 +539,9 @@ local function equipWeapon(weaponType, callback)
 	end
 
 	if
-		Collection:HasTag(char, "Invulnerable")
-		or Collection:HasTag(char, "CombatDisabled")
-		or Collection:HasTag(char, "SpeedTrail")
+		Collection:HasTag(playerCache[1], "Invulnerable")
+		or Collection:HasTag(playerCache[1], "CombatDisabled")
+		or Collection:HasTag(playerCache[1], "SpeedTrail")
 	then
 		return
 	end
@@ -588,15 +588,14 @@ local function handleAutoEquip()
 		return
 	end
 
-	local char = player.Character
-	if not char or not char.Parent then
+	if not playerCache[1] or not playerCache[1].Parent then
 		return
 	end
 
 	if
-		Collection:HasTag(char, "Invulnerable")
-		or Collection:HasTag(char, "CombatDisabled")
-		or Collection:HasTag(char, "SpeedTrail")
+		Collection:HasTag(playerCache[1], "Invulnerable")
+		or Collection:HasTag(playerCache[1], "CombatDisabled")
+		or Collection:HasTag(playerCache[1], "SpeedTrail")
 	then
 		return
 	end
@@ -649,8 +648,8 @@ local function handleAutoEquip()
 end
 
 local function handleCombat()
-	local char, localHrp, animator = unpack(playerReferences)
-	if not char or not localHrp or not animator then
+	local char, hrp, humanoid, animator = playerCache[1], playerCache[2], playerCache[3], playerCache[4]
+	if not char or not hrp or not humanoid or not animator then
 		return
 	end
 
@@ -659,11 +658,11 @@ local function handleCombat()
 		or Collection:HasTag(char, "CombatDisabled")
 		or Collection:HasTag(char, "SpeedTrail")
 	then
-	  char:FindFirstChildOfClass("Humanoid"):UnequipTools()
+		humanoid:UnequipTools()
 		return
 	end
 
-	local bestTarget, bestPart, bestKnifeTarget, bestKnifePoint = findBestTarget(localHrp)
+	local bestTarget, bestPart, bestKnifeTarget, bestKnifePoint = findBestTarget(hrp)
 	if not bestTarget or not bestPart then
 		return
 	end
@@ -674,7 +673,7 @@ local function handleCombat()
 	end
 
 	task.wait(getgenv().aimConfig.REACTION_TIME)
-	if not isValidTarget(bestTarget, localHrp) then
+	if not isValidTarget(bestTarget, hrp) then
 		return
 	end
 
@@ -683,18 +682,18 @@ local function handleCombat()
 		local gunReady = not getgenv().controller.lock.gun
 			and (tick() - getgenv().controller.gunCooldown >= (weapon:GetAttribute("Cooldown") or 2.5))
 		if gunReady and bestPart and bestPart.Parent then
-			fireGun(bestPart.Position, bestPart, localHrp, animator)
+			fireGun(bestPart.Position, bestPart, hrp, animator)
 		end
 	elseif equipType == WEAPON_TYPE.KNIFE then
 		if
 			not getgenv().controller.lock.knife
 			and bestKnifeTarget
 			and bestKnifePoint
-			and isValidTarget(bestKnifeTarget, localHrp)
+			and isValidTarget(bestKnifeTarget, hrp)
 		then
 			local targetHrp = bestKnifeTarget.Character:FindFirstChild("HumanoidRootPart")
 			if targetHrp then
-				throwKnife(bestKnifePoint, targetHrp, localHrp, animator)
+				throwKnife(bestKnifePoint, targetHrp, hrp, animator)
 			end
 		end
 	end
