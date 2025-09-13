@@ -44,7 +44,7 @@ local Window = Windui:CreateWindow({
 local modules = {}
 function loadModule(file)
 	if modules[file] then
-		return
+		return modules[file]
 	end
 
 	table.insert(modules, file)
