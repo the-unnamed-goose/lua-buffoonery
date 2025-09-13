@@ -409,7 +409,7 @@ local antiCrash = Misc:Toggle({
 	Callback = function(state)
 		if state or localPlayer.Character then
 			crashConnection = localPlayer.CharacterAdded:Connect(function()
-				local module = Replicated.Abilities:WaitForChild("ShroudProjectileController", 5)
+				local module = Replicated.Ability:WaitForChild("ShroudProjectileController", 5)
 				local replacement = Instance.new("ModuleScript")
 				replacement.Name = "ShroudProjectileController"
 				if module then
