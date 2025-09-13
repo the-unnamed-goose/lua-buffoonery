@@ -80,7 +80,7 @@ local function initializePlayer()
 	local hrp = char:WaitForChild("HumanoidRootPart")
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum and hum:WaitForChild("Animator")
-	
+
 	playerCache = { char, hrp, hum, animator }
 end
 
@@ -96,11 +96,11 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 
 	shotCount = shotCount + 1
 	math.randomseed(deviationSeed + shotCount)
-	
+
 	local currentTime = tick()
 	local timeSinceLastShot = currentTime - lastShotTime
 	lastShotTime = currentTime
-	
+
 	if timeSinceLastShot < 2 then
 		accuracyBonus = math.min(accuracyBonus + getgenv().aimConfig.ACCURACY_BUILDUP, 1.0)
 	else
@@ -115,14 +115,15 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	end
 
 	local distanceFactor = (distance / getgenv().aimConfig.MAX_DISTANCE) * getgenv().aimConfig.DISTANCE_FACTOR
-	
+
 	local velocityFactor = 0
 	if targetChar then
 		local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
 		local hrp = targetChar:FindFirstChild("HumanoidRootPart")
 		if humanoid and hrp then
 			local horizontalVelocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z).Magnitude
-			velocityFactor = (horizontalVelocity / getgenv().aimConfig.MAX_VELOCITY) * getgenv().aimConfig.VELOCITY_FACTOR
+			velocityFactor = (horizontalVelocity / getgenv().aimConfig.MAX_VELOCITY)
+				* getgenv().aimConfig.VELOCITY_FACTOR
 		end
 	end
 
@@ -147,7 +148,7 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 
 	local cosH, sinH = math.cos(horizontalDeviation), math.sin(horizontalDeviation)
 	local cosV, sinV = math.cos(verticalDeviation), math.sin(verticalDeviation)
-	
+
 	local tempDir = direction * cosH + right * sinH
 	local deviatedDirection = (tempDir * cosV + up * sinV).Unit
 
@@ -155,10 +156,11 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	if playerCache[1] and playerCache[1].Parent then
 		table.insert(safeFilterList, playerCache[1])
 	end
-	
+
 	misfireRayParams.FilterDescendantsInstances = safeFilterList
-	
-	local rayResult = Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.RAYCAST_DISTANCE, misfireRayParams)
+
+	local rayResult =
+		Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.RAYCAST_DISTANCE, misfireRayParams)
 
 	if shotCount >= 1000 then
 		shotCount = 0
@@ -167,7 +169,6 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 
 	return rayResult and rayResult.Position or originalPos, rayResult and rayResult.Instance
 end
-
 
 local function predictTargetPoint(targetHrp)
 	local currentPos = targetHrp.Position

@@ -34,10 +34,10 @@ RunService.RenderStepped:Connect(function()
 		and Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
 	ping = ping and math.floor(ping) or "?"
 
-	local fpsColor = fps >= 60 and Color3.fromRGB(0, 255, 0)
-		or (fps >= 30 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0))
+	local fpsColor = fps >= 50 and Color3.fromRGB(0, 255, 0)
+		or (fps >= 35 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0))
 	local pingColor = ping ~= "?"
-			and (ping <= 80 and Color3.fromRGB(0, 255, 0) or (ping <= 150 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(
+			and (ping <= 200 and Color3.fromRGB(0, 255, 0) or (ping <= 350 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(
 				255,
 				0,
 				0

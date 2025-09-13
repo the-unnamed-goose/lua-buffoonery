@@ -1,5 +1,6 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Replicated = game:GetService("ReplicatedStorage")
 local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
 
 getgenv().aimConfig = {
@@ -39,7 +40,6 @@ local Window = Windui:CreateWindow({
 	HideSearchBar = true,
 	ScrollBarEnabled = false,
 })
-local Config = Window.ConfigManager
 
 local modules = {}
 function loadModule(file)
@@ -69,37 +69,6 @@ function lockToggle(origin)
 	if knifeToggle and knifeToggle.Unlock then
 		knifeToggle:Unlock()
 	end
-end
-
-local defaultConfig = Config:CreateConfig("default")
-local currentConfig = defaultConfig
-local saveName = "default"
-function registerConfig(table)
-	table:Register("AimBotEnabled", aimToggle)
-	table:Register("CameraCast", cameraToggle)
-	table:Register("FOVCheck", fovToggle)
-	table:Register("AutoEquip", equipToggle)
-	table:Register("NativeUI", interfaceToggle)
-	table:Register("DeviationEnabled", deviationToggle)
-
-	table:Register("MaxDistance", distanceSlider)
-	table:Register("MaxVelocity", velocitySlider)
-	table:Register("VisibleParts", partsSlider)
-	table:Register("ReactionTime", reactionSlider)
-	table:Register("ActionTime", actionSlider)
-	table:Register("EquipTime", equipSlider)
-	table:Register("BaseDeviation", baseDeviationSlider)
-	table:Register("DistanceFactor", distanceFactorSlider)
-	table:Register("VelocityFactor", velocityFactorSlider)
-	table:Register("AccuracyBuildup", accuracyBuildupSlider)
-	table:Register("MinDeviation", minDeviationSlider)
-
-	table:Register("ESPEnabled", espToggle)
-	table:Register("ESPTeam", teamToggle)
-	table:Register("ESPEnemies", enemyToggle)
-
-	table:Register("LoopKnife", knifeToggle)
-	table:Register("LoopGun", gunToggle)
 end
 
 local Aim = Window:Tab({
@@ -279,7 +248,7 @@ local distanceFactorSlider = Aim:Slider({
 })
 
 local velocityFactorSlider = Aim:Slider({
-	Title = "Velocity Factor", 
+	Title = "Velocity Factor",
 	Desc = "Additional deviation penalty for moving targets - higher values make moving targets harder to hit",
 	Step = 0.1,
 	Value = {
@@ -360,63 +329,6 @@ local enemyToggle = Esp:Toggle({
 	end,
 })
 
-local Controls = Window:Tab({
-	Title = "Controls",
-	Icon = "keyboard",
-	Locked = false,
-})
-
-local renewerSystem = Controls:Toggle({
-	Title = "Delete Old Controllers",
-	Desc = "Should not be disabled unless you also want to disable the options bellow",
-	Value = true,
-	Callback = function(state)
-		local module = modules["mvsd/controllers/init.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/init.lua"] = nil
-			return
-		end
-		loadModule("mvsd/controllers/init.lua")
-	end,
-})
-
-local knifeController = Controls:Toggle({
-	Title = "Custom Knife Controller",
-	Desc = "Uses the custom knife input handler, improves support for some features of the game",
-	Value = true,
-	Callback = function(state)
-		local module = modules["mvsd/controllers/knife.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/knife.lua"] = nil
-			return
-		end
-		Windui:Notify({
-			Title = "Warning",
-			Content = "The custom knife controller has no mode toggle functionality (button) on mobile.",
-			Duration = 4,
-			Icon = "triangle-alert",
-		})
-		loadModule("mvsd/controllers/knife.lua")
-	end,
-})
-
-local gunController = Controls:Toggle({
-	Title = "Custom Gun Controller",
-	Desc = "Uses the custom gun input handler, improves support for some features of the game",
-	Value = true,
-	Callback = function(state)
-		local module = modules["mvsd/controllers/gun.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/gun.lua"] = nil
-			return
-		end
-		loadModule("mvsd/controllers/gun.lua")
-	end,
-})
-
 local Kill = Window:Tab({
 	Title = "Auto Kill",
 	Icon = "skull",
@@ -483,117 +395,117 @@ gunToggle = Kill:Toggle({
 	end,
 })
 
-registerConfig(defaultConfig)
-if defaultConfig then
-	Windui:Notify({
-		Title = "Warning",
-		Content = "The WindUI library doesn't properly implement a configuration manager, you are going to receive a very buggy experience if you use this feature.",
-		Duration = 8,
-		Icon = "triangle-alert",
-	})
-	defaultConfig:Load()
-end
-local Configs = Window:Tab({
-	Title = "Config",
-	Icon = "cog",
+local Misc = Window:Tab({
+	Title = "Misc",
+	Icon = "brackets",
 	Locked = false,
 })
 
-Configs:Input({
-	Title = "Config Name",
-	Desc = "Must be something other than 'default' because initialization magic",
-	Value = saveName,
-	Callback = function(value)
-		saveName = value or "default"
-	end,
-})
-
-local Save = Configs:Button({
-	Title = "Save",
-	Desc = "Saves the current configuration down to disk",
-	Callback = function()
-		if not saveName then
+local crashConnection
+local antiCrash = Misc:Toggle({
+	Title = "Anti Crash",
+	Desc = "Blocks the shroud projectile from rendering",
+	Value = true,
+	Callback = function(state)
+		if state or localPlayer.Character then
+			crashConnection = LocalPlayer.CharacterAdded:Connect(function()
+				local module = Replicated.Abilities:WaitForChild("ShroudProjectileController", 5)
+				local replacement = Instance.new("ModuleScript")
+				replacement.Name = "ShroudProjectileController"
+				if module then
+					local parent = module.Parent
+					replacement.Parent = parent
+					module:Destroy()
+				end
+			end)
 			return
 		end
+		crashConnection:Disconnect()
+	end,
+})
 
-		if saveName ~= "default" then
-			currentConfig = Config:CreateConfig(saveName)
-			registerConfig(currentConfig)
-		else
-			currentConfig = defaultConfig
+local updateSetting = Replicated.Settings:WaitForChild("UpdateSetting", 4)
+local lowPoly = Misc:Toggle({
+	Title = "Low Poly",
+	Desc = "Toggle the low poly mode",
+	Value = false,
+	Callback = function(state)
+		updateSetting:FireServer("LowGraphics", state)
+		updateSetting:FireServer("KillEffectsDisabled", state)
+		updateSetting:FireServer("LobbyMusicDisabled", state)
+	end,
+})
+
+local autoSpin = Misc:Toggle({
+	Title = "Auto Spin",
+	Desc = "Automatically spin the modifier wheel",
+	Value = false,
+	Callback = function(state)
+		getgenv().autoSpin = state
+		while wait(0.1) do
+			if getgenv().autoSpin and game:GetService("Players").LocalPlayer:GetAttribute("Match") then
+				Replicated.Dailies.Spin:InvokeServer()
+			else
+				break
+			end
 		end
-
-		currentConfig:Save()
-
-		Windui:Notify({
-			Title = "Save Manager",
-			Content = "Saved config " .. saveName,
-			Icon = "check",
-			Duration = 3,
-		})
 	end,
 })
 
-local Default = Configs:Button({
-	Title = "Save As Default",
-	Desc = "Automagically load this file on startup",
-	Callback = function()
-		defaultConfig:Save()
-
-		Windui:Notify({
-			Title = "Save Manager",
-			Content = "Successfully made config the default",
-			Icon = "check",
-			Duration = 3,
-		})
-	end,
+local Controls = Window:Tab({
+	Title = "Controls",
+	Icon = "keyboard",
+	Locked = false,
 })
 
-local Delete = Configs:Button({
-	Title = "Delete",
-	Desc = "Deletes a saved configuration",
-	Callback = function()
-		if not saveName or saveName == "default" then
+local renewerSystem = Controls:Toggle({
+	Title = "Delete Old Controllers",
+	Desc = "Should not be disabled unless you also want to disable the options bellow",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/init.lua"]
+		if not state and module then
+			module:Disconnect()
+			modules["mvsd/controllers/init.lua"] = nil
 			return
 		end
-		delfile(Config.Path .. saveName .. ".json")
-
-		Windui:Notify({
-			Title = "Save Manager",
-			Content = "Successfully deleted config",
-			Icon = "check",
-			Duration = 3,
-		})
+		loadModule("mvsd/controllers/init.lua")
 	end,
 })
 
-local Load = Configs:Button({
-	Title = "Load",
-	Desc = "Loads a saved configuration",
-	Callback = function()
-		if not saveName then
+local knifeController = Controls:Toggle({
+	Title = "Custom Knife Controller",
+	Desc = "Uses the custom knife input handler, improves support for some features of the game",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/knife.lua"]
+		if not state and module then
+			module:Disconnect()
+			modules["mvsd/controllers/knife.lua"] = nil
 			return
 		end
-
 		Windui:Notify({
 			Title = "Warning",
-			Content = "The WindUI library doesn't properly implement a configuration manager, you are going to receive a very buggy experience if you use this feature.",
-			Duration = 8,
+			Content = "The custom knife controller has no mode toggle functionality (button) on mobile.",
+			Duration = 4,
 			Icon = "triangle-alert",
 		})
+		loadModule("mvsd/controllers/knife.lua")
+	end,
+})
 
-		local loadConfig = Config:CreateConfig(saveName)
-		registerConfig(loadConfig)
-
-		loadConfig:Load()
-		currentConfig = loadConfig
-
-		Windui:Notify({
-			Title = "Save Manager",
-			Content = "Config loaded successfully",
-			Icon = "check",
-			Duration = 3,
-		})
+local gunController = Controls:Toggle({
+	Title = "Custom Gun Controller",
+	Desc = "Uses the custom gun input handler, improves support for some features of the game",
+	Value = true,
+	Callback = function(state)
+		local module = modules["mvsd/controllers/gun.lua"]
+		if not state and module then
+			module:Disconnect()
+			modules["mvsd/controllers/gun.lua"] = nil
+			return
+		end
+		loadModule("mvsd/controllers/gun.lua")
 	end,
 })
 
