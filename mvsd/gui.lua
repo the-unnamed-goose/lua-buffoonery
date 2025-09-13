@@ -23,7 +23,7 @@ getgenv().aimConfig = {
 	RAYCAST_DISTANCE = 1000,
 }
 getgenv().espTeamMates = true
-getgenv().ESPEnemies = true
+getgenv().espEnemies = true
 getgenv().killButton = { gun = false, knife = false }
 getgenv().killLoop = { gun = false, knife = false }
 
@@ -408,7 +408,7 @@ local antiCrash = Misc:Toggle({
 	Value = true,
 	Callback = function(state)
 		if state or localPlayer.Character then
-			crashConnection = LocalPlayer.CharacterAdded:Connect(function()
+			crashConnection = localPlayer.CharacterAdded:Connect(function()
 				local module = Replicated.Abilities:WaitForChild("ShroudProjectileController", 5)
 				local replacement = Instance.new("ModuleScript")
 				replacement.Name = "ShroudProjectileController"
