@@ -28,11 +28,11 @@ getgenv().killButton = { gun = false, knife = false }
 getgenv().killLoop = { gun = false, knife = false }
 
 local Window = Windui:CreateWindow({
-	Title = "[Open Source] MVSD Script",
+	Title = "RC 4",
 	Icon = "square-function",
 	Author = "by Le Honk",
 	Folder = "MVSD_Graphics",
-	Size = UDim2.fromOffset(260, 300),
+	Size = UDim2.fromOffset(580, 100),
 	Transparent = true,
 	Theme = "Dark",
 	Resizable = true,
@@ -41,13 +41,44 @@ local Window = Windui:CreateWindow({
 	ScrollBarEnabled = false,
 })
 
+local Config = Window.ConfigManager
+local default = Config:CreateConfig("default")
+local saveFlag = "WindUI/" .. Window.Folder .. "/config/autosave"
+local loadFlag = "WindUI/" .. Window.Folder .. "/config/autoload"
+local Elements = {}
+
+-- Initialize modules table before functions that use it
 local modules = {}
+
+local function saveConfig()
+	if isfile(saveFlag) then
+		default:Save()
+	end
+end
+
+local function disconnectModule(moduleName)
+	local module = modules[moduleName]
+	if not module then
+		return
+	end
+
+	if type(module) == "table" then
+		for _, connection in pairs(module) do
+			if connection and connection.Disconnect then
+				connection:Disconnect()
+			end
+		end
+	elseif module.Disconnect then
+		module:Disconnect()
+	end
+	modules[moduleName] = nil
+end
+
 function loadModule(file)
 	if modules[file] then
 		return modules[file]
 	end
 
-	table.insert(modules, file)
 	_, modules[file] = pcall(loadstring(game:HttpGet(Repository .. file)))
 end
 
@@ -77,68 +108,70 @@ local Aim = Window:Tab({
 	Locked = false,
 })
 
-local aimToggle = Aim:Toggle({
-	Title = "Feature status",
+Elements.aimToggle = Aim:Toggle({
+	Title = "Aim Bot status",
 	Desc = "Enable/Disable the aim bot",
 	Callback = function(state)
-		local module = modules["mvsd/aimbot.lua"]
-		if not state and module then
-			for _, connection in pairs(module) do
-				connection:Disconnect()
-			end
-			modules["mvsd/aimbot.lua"] = nil
+		if not state then
+			disconnectModule("mvsd/aimbot.lua")
 			return
 		end
 		loadModule("mvsd/aimbot.lua")
+		saveConfig()
 	end,
 })
 
-local cameraToggle = Aim:Toggle({
+Elements.cameraToggle = Aim:Toggle({
 	Title = "Native Raycast Method",
 	Desc = "Whether or not to check player visibility in the same way that the game does, if enabled doubles the amount of work the script has to do per check",
 	Value = true,
 	Callback = function(state)
 		getgenv().aimConfig.CAMERA_CAST = state
+		saveConfig()
 	end,
 })
 
-local fovToggle = Aim:Toggle({
+Elements.fovToggle = Aim:Toggle({
 	Title = "FOV Check",
 	Desc = "Whether or not to check if the target is in the current fov before selecting it",
 	Value = true,
 	Callback = function(state)
 		getgenv().aimConfig.FOV_CHECK = state
+		saveConfig()
 	end,
 })
 
-local equipToggle = Aim:Toggle({
+Elements.equipToggle = Aim:Toggle({
 	Title = "Switch weapons",
 	Desc = "Whether or not the script should automatically switch or equip the best available weapon",
 	Value = true,
 	Callback = function(state)
 		getgenv().aimConfig.AUTO_EQUIP = state
+		saveConfig()
 	end,
 })
 
-local interfaceToggle = Aim:Toggle({
+Elements.interfaceToggle = Aim:Toggle({
 	Title = "Native User Interface",
 	Desc = "Whether or not the script should render the gun cooldown and tool equip highlights",
 	Value = true,
 	Callback = function(state)
 		getgenv().aimConfig.NATIVE_UI = state
+		saveConfig()
 	end,
 })
 
-local deviationToggle = Aim:Toggle({
+Elements.deviationToggle = Aim:Toggle({
 	Title = "Aim Deviation",
 	Desc = "Whether or not the script should sometimes misfire when using the gun",
 	Value = true,
 	Callback = function(state)
 		getgenv().aimConfig.DEVIATION_ENABLED = state
+		saveConfig()
 	end,
 })
 
-local distanceSlider = Aim:Slider({
+Elements.distanceSlider = Aim:Slider({
 	Title = "Maximum distance",
 	Desc = "The maximum distance at which the script will no longer target enemies",
 	Value = {
@@ -148,10 +181,11 @@ local distanceSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_DISTANCE = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local velocitySlider = Aim:Slider({
+Elements.velocitySlider = Aim:Slider({
 	Title = "Maximum velocity",
 	Desc = "The maximum target velocity at which the script will no longer attempt to shoot a target",
 	Value = {
@@ -161,10 +195,11 @@ local velocitySlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_VELOCITY = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local partsSlider = Aim:Slider({
+Elements.partsSlider = Aim:Slider({
 	Title = "Required Visible Parts",
 	Desc = "The amount of visible player parts the script will require before selecting a target",
 	Value = {
@@ -174,10 +209,11 @@ local partsSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.VISIBLE_PARTS = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local reactionSlider = Aim:Slider({
+Elements.reactionSlider = Aim:Slider({
 	Title = "Reaction Time",
 	Desc = "The amount of time the script will wait before attacking a given target, is not applied when 'Switch Weapons' is toggled",
 	Step = 0.01,
@@ -188,10 +224,11 @@ local reactionSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.REACTION_TIME = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local actionSlider = Aim:Slider({
+Elements.actionSlider = Aim:Slider({
 	Title = "Action Time",
 	Desc = "The amount of time the script will wait after switching or equipping a weapon before attacking a given target, is not applied when 'Switch Weapons' is not toggled",
 	Step = 0.01,
@@ -202,10 +239,11 @@ local actionSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.ACTION_TIME = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local equipSlider = Aim:Slider({
+Elements.equipSlider = Aim:Slider({
 	Title = "Equip Time",
 	Desc = "The amount of time the script will wait before checking what is the best weapon to equip again.",
 	Step = 0.1,
@@ -216,10 +254,11 @@ local equipSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.EQUIP_LOOP = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local baseDeviationSlider = Aim:Slider({
+Elements.baseDeviationSlider = Aim:Slider({
 	Title = "Base Deviation",
 	Desc = "Base aim inaccuracy in degrees, controls how much the aim naturally deviates",
 	Step = 0.1,
@@ -230,10 +269,11 @@ local baseDeviationSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.BASE_DEVIATION = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local distanceFactorSlider = Aim:Slider({
+Elements.distanceFactorSlider = Aim:Slider({
 	Title = "Distance Factor",
 	Desc = "Additional deviation penalty for distance - higher values make long shots less accurate",
 	Step = 0.1,
@@ -244,10 +284,11 @@ local distanceFactorSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.DISTANCE_FACTOR = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local velocityFactorSlider = Aim:Slider({
+Elements.velocityFactorSlider = Aim:Slider({
 	Title = "Velocity Factor",
 	Desc = "Additional deviation penalty for moving targets - higher values make moving targets harder to hit",
 	Step = 0.1,
@@ -258,10 +299,11 @@ local velocityFactorSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.VELOCITY_FACTOR = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local accuracyBuildupSlider = Aim:Slider({
+Elements.accuracyBuildupSlider = Aim:Slider({
 	Title = "Accuracy Buildup",
 	Desc = "How much accuracy improves with consecutive shots - higher values = faster improvement",
 	Step = 0.01,
@@ -272,10 +314,11 @@ local accuracyBuildupSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.ACCURACY_BUILDUP = tonumber(value)
+		saveConfig()
 	end,
 })
 
-local minDeviationSlider = Aim:Slider({
+Elements.minDeviationSlider = Aim:Slider({
 	Title = "Min Deviation",
 	Desc = "Minimum deviation that always remains - prevents perfect accuracy",
 	Step = 0.1,
@@ -286,6 +329,7 @@ local minDeviationSlider = Aim:Slider({
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MIN_DEVIATION = tonumber(value)
+		saveConfig()
 	end,
 })
 
@@ -295,37 +339,36 @@ local Esp = Window:Tab({
 	Locked = false,
 })
 
-local espToggle = Esp:Toggle({
-	Title = "Feature status",
+Elements.espToggle = Esp:Toggle({
+	Title = "ESP status",
 	Desc = "Enable/Disable the ESP",
 	Callback = function(state)
-		local module = modules["mvsd/esp.lua"]
-		if not state and module then
-			for _, connection in pairs(module) do
-				connection:Disconnect()
-			end
-			modules["mvsd/esp.lua"] = nil
+		if not state then
+			disconnectModule("mvsd/esp.lua")
 			return
 		end
-		return loadModule("mvsd/esp.lua")
+		loadModule("mvsd/esp.lua")
+		saveConfig()
 	end,
 })
 
-local teamToggle = Esp:Toggle({
+Elements.teamToggle = Esp:Toggle({
 	Title = "Display Team",
 	Desc = "Whether or not to highlight your teammates",
 	Value = true,
 	Callback = function(state)
 		getgenv().espTeamMates = state
+		saveConfig()
 	end,
 })
 
-local enemyToggle = Esp:Toggle({
+Elements.enemyToggle = Esp:Toggle({
 	Title = "Display Enemies",
 	Desc = "Whether or not to highlight your enemies",
 	Value = true,
 	Callback = function(state)
 		getgenv().espEnemies = state
+		saveConfig()
 	end,
 })
 
@@ -357,20 +400,15 @@ knifeToggle = Kill:Toggle({
 	Title = "[Knife] Loop Kill All",
 	Desc = "Repeatedly kills all players using the knife",
 	Callback = function(state)
-		if state then
-			local module = modules["mvsd/killall.lua"]
-			if not module then
-				module:Disconnect()
-				modules["mvsd/killall.lua"] = nil
-				return
-			end
-
-			lockToggle("knife")
-		else
-			lockToggle()
-		end
 		getgenv().killLoop.knife = state
+		if not state then
+			disconnectModule("mvsd/killall.lua")
+			lockToggle()
+			return
+		end
+		lockToggle("knife")
 		loadModule("mvsd/killall.lua")
+		saveConfig()
 	end,
 })
 
@@ -378,20 +416,15 @@ gunToggle = Kill:Toggle({
 	Title = "[Gun] Loop Kill All",
 	Desc = "Repeatedly kills all players using the gun",
 	Callback = function(state)
-		if state then
-			local module = modules["mvsd/killall.lua"]
-			if not module then
-				module:Disconnect()
-				modules["mvsd/killall.lua"] = nil
-				return
-			end
-
-			lockToggle("gun")
-		else
-			lockToggle()
-		end
 		getgenv().killLoop.gun = state
+		if not state then
+			disconnectModule("mvsd/killall.lua")
+			lockToggle()
+			return
+		end
+		lockToggle("gun")
 		loadModule("mvsd/killall.lua")
+		saveConfig()
 	end,
 })
 
@@ -402,13 +435,22 @@ local Misc = Window:Tab({
 })
 
 local crashConnection
-local antiCrash = Misc:Toggle({
+local player = game:GetService("Players").LocalPlayer
+Elements.antiCrash = Misc:Toggle({
 	Title = "Anti Crash",
 	Desc = "Blocks the shroud projectile from rendering",
 	Value = true,
 	Callback = function(state)
-		if state or localPlayer.Character then
-			crashConnection = localPlayer.CharacterAdded:Connect(function()
+		if not state then
+			if crashConnection then
+				crashConnection:Disconnect()
+			end
+			saveConfig()
+			return
+		end
+
+		if player.Character then
+			crashConnection = player.CharacterAdded:Connect(function()
 				local module = Replicated.Ability:WaitForChild("ShroudProjectileController", 5)
 				local replacement = Instance.new("ModuleScript")
 				replacement.Name = "ShroudProjectileController"
@@ -418,14 +460,13 @@ local antiCrash = Misc:Toggle({
 					module:Destroy()
 				end
 			end)
-			return
 		end
-		crashConnection:Disconnect()
+		saveConfig()
 	end,
 })
 
 local updateSetting = Replicated.Settings:WaitForChild("UpdateSetting", 4)
-local lowPoly = Misc:Toggle({
+Elements.lowPoly = Misc:Toggle({
 	Title = "Low Poly",
 	Desc = "Toggle the low poly mode",
 	Value = false,
@@ -433,96 +474,164 @@ local lowPoly = Misc:Toggle({
 		updateSetting:FireServer("LowGraphics", state)
 		updateSetting:FireServer("KillEffectsDisabled", state)
 		updateSetting:FireServer("LobbyMusicDisabled", state)
+		saveConfig()
 	end,
 })
 
-local autoSpin = Misc:Toggle({
+Elements.autoSpin = Misc:Toggle({
 	Title = "Auto Spin",
 	Desc = "Automatically spin the modifier wheel",
 	Value = false,
 	Callback = function(state)
 		getgenv().autoSpin = state
-		while wait(0.1) do
-			if getgenv().autoSpin and game:GetService("Players").LocalPlayer:GetAttribute("Match") then
-				Replicated.Dailies.Spin:InvokeServer()
-			else
-				break
-			end
+		if not state then
+			saveConfig()
+			return
 		end
+
+		spawn(function()
+			while getgenv().autoSpin do
+				if player:GetAttribute("Match") then
+					Replicated.Dailies.Spin:InvokeServer()
+				end
+				wait(0.1)
+			end
+		end)
+		saveConfig()
 	end,
 })
 
-local Controls = Window:Tab({
-	Title = "Controls",
+local Controller = Window:Tab({
+	Title = "Controller",
 	Icon = "keyboard",
 	Locked = false,
 })
 
-local renewerSystem = Controls:Toggle({
+Windui:Notify({
+	Title = "Warning",
+	Content = "The custom knife controller has no mode toggle functionality (button) on mobile.",
+	Duration = 4,
+	Icon = "triangle-alert",
+})
+
+Elements.renewerSystem = Controller:Toggle({
 	Title = "Delete Old Controllers",
 	Desc = "Should not be disabled unless you also want to disable the options bellow",
 	Value = true,
 	Callback = function(state)
-		local module = modules["mvsd/controllers/init.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/init.lua"] = nil
+		if not state then
+			disconnectModule("mvsd/controllers/init.lua")
 			return
 		end
 		loadModule("mvsd/controllers/init.lua")
+		saveConfig()
 	end,
 })
 
-local knifeController = Controls:Toggle({
+Elements.knifeController = Controller:Toggle({
 	Title = "Custom Knife Controller",
 	Desc = "Uses the custom knife input handler, improves support for some features of the game",
 	Value = true,
 	Callback = function(state)
-		local module = modules["mvsd/controllers/knife.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/knife.lua"] = nil
+		if not state then
+			disconnectModule("mvsd/controllers/knife.lua")
 			return
 		end
-		Windui:Notify({
-			Title = "Warning",
-			Content = "The custom knife controller has no mode toggle functionality (button) on mobile.",
-			Duration = 4,
-			Icon = "triangle-alert",
-		})
 		loadModule("mvsd/controllers/knife.lua")
+		saveConfig()
 	end,
 })
 
-local gunController = Controls:Toggle({
+Elements.gunController = Controller:Toggle({
 	Title = "Custom Gun Controller",
 	Desc = "Uses the custom gun input handler, improves support for some features of the game",
 	Value = true,
 	Callback = function(state)
-		local module = modules["mvsd/controllers/gun.lua"]
-		if not state and module then
-			module:Disconnect()
-			modules["mvsd/controllers/gun.lua"] = nil
+		if not state then
+			disconnectModule("mvsd/controllers/gun.lua")
 			return
 		end
 		loadModule("mvsd/controllers/gun.lua")
+		saveConfig()
 	end,
 })
 
-local Credits = Window:Tab({
-	Title = "Credits",
-	Icon = "book-marked",
+local Settings = Window:Tab({
+	Title = "Settings",
+	Icon = "settings",
 	Locked = false,
 })
 
-local gooseCredit = Credits:Paragraph({
+Settings:Section({
+	Title = "General",
+})
+
+local themes = {}
+for theme, _ in pairs(WindUI:GetThemes()) do
+	table.insert(themes, theme)
+end
+table.sort(themes)
+
+Elements.themeDrop = Settings:Dropdown({
+	Title = "Theme Selector",
+	Values = themes,
+	Value = "Dark",
+	Callback = function(option)
+		WindUI:SetTheme(option)
+		saveConfig()
+	end,
+})
+
+local loadToggle = Settings:Toggle({
+	Title = "Auto Load",
+	Desc = "Makes the configs persist in between executions",
+	Value = isfile(loadFlag),
+	Callback = function(state)
+		if state then
+			writefile(loadFlag, "")
+		else
+			delfile(loadFlag)
+		end
+	end,
+})
+
+local saveToggle = Settings:Toggle({
+	Title = "Auto Save",
+	Desc = "Automatically saves the configs when changes are made",
+	Value = isfile(saveFlag),
+	Callback = function(state)
+		if state then
+			writefile(saveFlag, "")
+		else
+			delfile(saveFlag)
+		end
+	end,
+})
+
+Settings:Section({
+	Title = "Credits",
+})
+
+local gooseCredit = Settings:Paragraph({
 	Title = "Goose",
 	Desc = "The script developer, rewrote everything from scratch, if you encounter any issues please report them at https://github.com/goose-birb/lua-buffoonery/issues",
 })
 
-local footagesusCredit = Credits:Paragraph({
+local footagesusCredit = Settings:Paragraph({
 	Title = "Footagesus",
-	Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox. He's also the reason why the configs don't work XD",
+	Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox.",
 })
 
+for _, element in pairs(Elements) do
+	default:Register(element.Title, element)
+end
+
 Window:SelectTab(1)
+if isfile(loadFlag) then
+	genv = default:Load()
+	for _, element in pairs(Elements) do
+		if element.__type == "Dropdown" then
+			element.Callback(element.Value)
+		end
+	end
+end
