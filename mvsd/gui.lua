@@ -15,10 +15,10 @@ getgenv().aimConfig = {
 	EQUIP_LOOP = 0.3,
 	NATIVE_UI = true,
 	DEVIATION_ENABLED = true,
-	BASE_DEVIATION = 2.05,
-	DISTANCE_FACTOR = 0.6,
-	VELOCITY_FACTOR = 0.9,
-	ACCURACY_BUILDUP = 0.14,
+	BASE_DEVIATION = 2.10,
+	DISTANCE_FACTOR = 0.8,
+	VELOCITY_FACTOR = 1.20,
+	ACCURACY_BUILDUP = 0.8,
 	MIN_DEVIATION = 1,
 	RAYCAST_DISTANCE = 1000,
 }
@@ -265,7 +265,7 @@ Elements.baseDeviationSlider = Aim:Slider({
 	Value = {
 		Min = 0.5,
 		Max = 5,
-		Default = 2.05,
+		Default = 2.10,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.BASE_DEVIATION = tonumber(value)
@@ -280,7 +280,7 @@ Elements.distanceFactorSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 2,
-		Default = 0.6,
+		Default = 0.8,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.DISTANCE_FACTOR = tonumber(value)
@@ -295,7 +295,7 @@ Elements.velocityFactorSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 2,
-		Default = 0.9,
+		Default = 1.2,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.VELOCITY_FACTOR = tonumber(value)
@@ -309,8 +309,8 @@ Elements.accuracyBuildupSlider = Aim:Slider({
 	Step = 0.01,
 	Value = {
 		Min = 0,
-		Max = 0.5,
-		Default = 0.13,
+		Max = 2,
+		Default = 0.8,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.ACCURACY_BUILDUP = tonumber(value)
