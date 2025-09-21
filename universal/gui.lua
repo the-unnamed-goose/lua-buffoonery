@@ -1,3 +1,4 @@
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
 local Input = game:GetService("UserInputService")
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
