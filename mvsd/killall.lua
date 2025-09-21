@@ -13,7 +13,7 @@ local WEAPON_TYPE = { gun = "Gun_Equip", knife = "Knife_Equip" }
 -- getgenv().killButton = { gun = false, knife = false }
 -- getgenv().killLoop = { gun = false, knife = false }
 
-local localPlayer = Players.LocalPlayer
+local player = Players.player
 local lock = { gun = false, knife = false }
 local enemyCache = {}
 
@@ -21,7 +21,7 @@ function updateCache()
 	enemyCache = {}
 	for _, enemy in pairs(Players:GetPlayers()) do
 		task.spawn(function()
-			if enemy and enemy ~= localPlayer and enemy.Team and enemy.Team ~= localPlayer.Team then
+			if enemy and enemy ~= player and enemy.Team and enemy.Team ~= player.Team then
 				if enemy.Character and enemy.Character.Parent == Workspace then
 					local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
 					if targetPart then
@@ -34,8 +34,8 @@ function updateCache()
 end
 
 local function equipWeapon(weaponType)
-	local backpack = localPlayer.Backpack
-	local character = localPlayer.Character
+	local backpack = player.Backpack
+	local character = player.Character
 	if not character or not backpack then
 		return false
 	end
@@ -51,7 +51,7 @@ local function equipWeapon(weaponType)
 end
 
 local function killAllKnife()
-	local character = localPlayer.Character
+	local character = player.Character
 	if not character then
 		return
 	end
@@ -74,7 +74,7 @@ local function killAllKnife()
 end
 
 local function killAllGun()
-	local character = localPlayer.Character
+	local character = player.Character
 	if not character then
 		return
 	end
@@ -90,12 +90,14 @@ local function killAllGun()
 	end
 end
 
-if localPlayer.Character then
+if player.Character then
 	updateCache()
 end
 
 local Connections = {}
-Connections[0] = Run.Heartbeat:Connect(function()
+Connections[0] = Run.Heartbeat:Connect(updateCache)
+
+Connections[1] = Run.Heartbeat:Connect(function()
 	if getgenv().killButton.knife then
 		equipWeapon(WEAPON_TYPE.knife)
 		killAllKnife()
@@ -109,8 +111,6 @@ Connections[0] = Run.Heartbeat:Connect(function()
 	end
 end)
 
-Connections[1] = Run.Heartbeat:Connect(updateCache)
-
 Connections[2] = Run.RenderStepped:Connect(function()
 	if getgenv().killLoop.gun and not lock.gun then
 		killAllGun()
@@ -121,8 +121,8 @@ Connections[2] = Run.RenderStepped:Connect(function()
 	end
 end)
 
-Connections[3] = localPlayer.CharacterAdded:Connect(function()
-	local character = localPlayer.Character
+Connections[3] = player.CharacterAdded:Connect(function()
+	local character = player.Character
 	if not character then
 		return
 	end
@@ -137,7 +137,7 @@ Connections[3] = localPlayer.CharacterAdded:Connect(function()
 	end
 
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 3)
-	if not humanoidRootPart or not localPlayer:GetAttribute("Match") then
+	if not humanoidRootPart or not player:GetAttribute("Match") then
 		return
 	end
 

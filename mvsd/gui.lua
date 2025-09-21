@@ -1,4 +1,5 @@
 -- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
+local Players = game:GetService("Players")
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local Replicated = game:GetService("ReplicatedStorage")
 local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
@@ -16,29 +17,26 @@ getgenv().aimConfig = {
 	NATIVE_UI = true,
 	DEVIATION_ENABLED = true,
 	BASE_DEVIATION = 2.10,
-	DISTANCE_FACTOR = 0.8,
+	DISTANCE_FACTOR = 1,
 	VELOCITY_FACTOR = 1.20,
-	ACCURACY_BUILDUP = 0.8,
+	ACCURACY_BUILDUP = 0.5,
 	MIN_DEVIATION = 1,
 	RAYCAST_DISTANCE = 1000,
 }
-getgenv().espTeamMates = true
+getgenv().espTeammates = true
 getgenv().espEnemies = true
 getgenv().killButton = { gun = false, knife = false }
 getgenv().killLoop = { gun = false, knife = false }
 
 local Window = Windui:CreateWindow({
-	Title = "RC 4",
+	Title = "RC 5",
 	Icon = "square-function",
 	Author = "by Le Honk",
-	Folder = "MVSD_Graphics",
-	Size = UDim2.fromOffset(580, 100),
-	Transparent = true,
+	Folder = "MVSD",
 	Theme = "Dark",
+	Size = UDim2.fromOffset(580, 100),
 	Resizable = true,
-	SideBarWidth = 120,
-	HideSearchBar = true,
-	ScrollBarEnabled = false,
+	Transparent = true,
 })
 
 local Config = Window.ConfigManager
@@ -47,17 +45,94 @@ local saveFlag = "WindUI/" .. Window.Folder .. "/config/autosave"
 local loadFlag = "WindUI/" .. Window.Folder .. "/config/autoload"
 local Elements = {}
 
--- Initialize modules table before functions that use it
-local modules = {}
+local asset = {}
+local animation = {}
+local emotes = { "Press to try and refresh" }
+local resumeAnimation = ""
+local animator
+local track
 
-local function saveConfig()
+local player = Players.LocalPlayer
+local function refreshAnimations()
+	if not player.Character then
+		return
+	end
+
+	animation = {}
+	emotes = {}
+
+	for _, obj in ipairs(game:GetDescendants()) do
+		local name = obj.Name
+		if obj:IsA("Animation") and not animation[name] then
+			animation[name] = obj
+			table.insert(emotes, name)
+		end
+	end
+
+	for _, assetid in ipairs(asset) do
+		if not animation[assetid] then
+			local instance = Instance.new("Animation")
+			instance.AnimationId = assetid
+
+			animation[assetid] = instance
+			table.insert(emotes, assetid)
+		end
+	end
+
+	table.sort(emotes)
+end
+
+local notifyFlag
+local function playAnimation(name)
+	if not notifyFlag then
+		notifyFlag = 0
+		Windui:Notify({
+			Title = "Warning",
+			Content = "Some emotes require server replicated parts and thus cannot be triggered without server interactions.",
+			Duration = 4,
+			Icon = "triangle-alert",
+		})
+	end
+
+	if track then
+		track:Stop()
+	end
+
+	if animation[name] then
+		track = animator:LoadAnimation(animation[name])
+		track:Play()
+	end
+end
+
+local function handleTracks()
+	local humanoid = player.Character:WaitForChild("Humanoid")
+	animator = humanoid:WaitForChild("Animator")
+
+	humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+		if track and humanoid.MoveDirection.Magnitude > 0 then
+			track:Stop()
+			track = nil
+		end
+	end)
+end
+
+function Config:Save()
 	if isfile(saveFlag) then
 		default:Save()
 	end
 end
 
-local function disconnectModule(moduleName)
-	local module = modules[moduleName]
+local Modules = {}
+function Modules:Load(file)
+	if Modules[file] then
+		return Modules[file]
+	end
+
+	_, Modules[file] = pcall(loadstring(game:HttpGet(Repository .. file)))
+end
+
+function Modules:Unload(moduleName)
+	local module = Modules[moduleName]
 	if not module then
 		return
 	end
@@ -71,15 +146,7 @@ local function disconnectModule(moduleName)
 	elseif module.Disconnect then
 		module:Disconnect()
 	end
-	modules[moduleName] = nil
-end
-
-function loadModule(file)
-	if modules[file] then
-		return modules[file]
-	end
-
-	_, modules[file] = pcall(loadstring(game:HttpGet(Repository .. file)))
+	Modules[moduleName] = nil
 end
 
 local gunToggle
@@ -113,61 +180,61 @@ Elements.aimToggle = Aim:Toggle({
 	Desc = "Enable/Disable the aim bot",
 	Callback = function(state)
 		if not state then
-			disconnectModule("mvsd/aimbot.lua")
+			Modules:Unload("mvsd/aimbot.lua")
 			return
 		end
-		loadModule("mvsd/aimbot.lua")
-		saveConfig()
+		Modules:Load("mvsd/aimbot.lua")
+		Config:Save()
 	end,
 })
 
 Elements.cameraToggle = Aim:Toggle({
 	Title = "Native Raycast Method",
 	Desc = "Whether or not to check player visibility in the same way that the game does, if enabled doubles the amount of work the script has to do per check",
-	Value = true,
+	Value = getgenv().aimConfig.CAMERA_CAST,
 	Callback = function(state)
 		getgenv().aimConfig.CAMERA_CAST = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
 Elements.fovToggle = Aim:Toggle({
 	Title = "FOV Check",
 	Desc = "Whether or not to check if the target is in the current fov before selecting it",
-	Value = true,
+	Value = getgenv().aimConfig.FOV_CHECK,
 	Callback = function(state)
 		getgenv().aimConfig.FOV_CHECK = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
 Elements.equipToggle = Aim:Toggle({
 	Title = "Switch weapons",
 	Desc = "Whether or not the script should automatically switch or equip the best available weapon",
-	Value = true,
+	Value = getgenv().aimConfig.AUTO_EQUIP,
 	Callback = function(state)
 		getgenv().aimConfig.AUTO_EQUIP = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
 Elements.interfaceToggle = Aim:Toggle({
 	Title = "Native User Interface",
 	Desc = "Whether or not the script should render the gun cooldown and tool equip highlights",
-	Value = true,
+	Value = getgenv().aimConfig.NATIVE_UI,
 	Callback = function(state)
 		getgenv().aimConfig.NATIVE_UI = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
 Elements.deviationToggle = Aim:Toggle({
 	Title = "Aim Deviation",
 	Desc = "Whether or not the script should sometimes misfire when using the gun",
-	Value = true,
+	Value = getgenv().aimConfig.DEVIATION_ENABLED,
 	Callback = function(state)
 		getgenv().aimConfig.DEVIATION_ENABLED = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -177,11 +244,11 @@ Elements.distanceSlider = Aim:Slider({
 	Value = {
 		Min = 50,
 		Max = 1000,
-		Default = 250,
+		Default = getgenv().aimConfig.MAX_DISTANCE,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_DISTANCE = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -191,11 +258,11 @@ Elements.velocitySlider = Aim:Slider({
 	Value = {
 		Min = 20,
 		Max = 200,
-		Default = 40,
+		Default = getgenv().aimConfig.MAX_VELOCITY,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MAX_VELOCITY = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -205,11 +272,11 @@ Elements.partsSlider = Aim:Slider({
 	Value = {
 		Min = 1,
 		Max = 18,
-		Default = 4,
+		Default = getgenv().aimConfig.VISIBLE_PARTS,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.VISIBLE_PARTS = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -220,11 +287,11 @@ Elements.reactionSlider = Aim:Slider({
 	Value = {
 		Min = 0.01,
 		Max = 1,
-		Default = 0.18,
+		Default = getgenv().aimConfig.REACTION_TIME,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.REACTION_TIME = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -235,11 +302,11 @@ Elements.actionSlider = Aim:Slider({
 	Value = {
 		Min = 0.2,
 		Max = 4,
-		Default = 0.32,
+		Default = getgenv().aimConfig.ACTION_TIME,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.ACTION_TIME = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -250,11 +317,11 @@ Elements.equipSlider = Aim:Slider({
 	Value = {
 		Min = 0.1,
 		Max = 4,
-		Default = 0.3,
+		Default = getgenv().aimConfig.EQUIP_LOOP,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.EQUIP_LOOP = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -265,11 +332,11 @@ Elements.baseDeviationSlider = Aim:Slider({
 	Value = {
 		Min = 0.5,
 		Max = 5,
-		Default = 2.10,
+		Default = getgenv().aimConfig.BASE_DEVIATION,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.BASE_DEVIATION = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -280,11 +347,11 @@ Elements.distanceFactorSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 2,
-		Default = 0.8,
+		Default = getgenv().aimConfig.DISTANCE_FACTOR,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.DISTANCE_FACTOR = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -295,11 +362,11 @@ Elements.velocityFactorSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 2,
-		Default = 1.2,
+		Default = getgenv().aimConfig.VELOCITY_FACTOR,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.VELOCITY_FACTOR = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -310,11 +377,11 @@ Elements.accuracyBuildupSlider = Aim:Slider({
 	Value = {
 		Min = 0,
 		Max = 2,
-		Default = 0.8,
+		Default = getgenv().aimConfig.ACCURACY_BUILDUP,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.ACCURACY_BUILDUP = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -325,11 +392,11 @@ Elements.minDeviationSlider = Aim:Slider({
 	Value = {
 		Min = 0.1,
 		Max = 3,
-		Default = 1,
+		Default = getgenv().aimConfig.MIN_DEVIATION,
 	},
 	Callback = function(value)
 		getgenv().aimConfig.MIN_DEVIATION = tonumber(value)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -344,31 +411,31 @@ Elements.espToggle = Esp:Toggle({
 	Desc = "Enable/Disable the ESP",
 	Callback = function(state)
 		if not state then
-			disconnectModule("mvsd/esp.lua")
+			Modules:Unload("mvsd/esp.lua")
 			return
 		end
-		loadModule("mvsd/esp.lua")
-		saveConfig()
+		Modules:Load("mvsd/esp.lua")
+		Config:Save()
 	end,
 })
 
 Elements.teamToggle = Esp:Toggle({
 	Title = "Display Team",
 	Desc = "Whether or not to highlight your teammates",
-	Value = true,
+	Value = getgenv().espTeammates,
 	Callback = function(state)
-		getgenv().espTeamMates = state
-		saveConfig()
+		getgenv().espTeammates = state
+		Config:Save()
 	end,
 })
 
 Elements.enemyToggle = Esp:Toggle({
 	Title = "Display Enemies",
 	Desc = "Whether or not to highlight your enemies",
-	Value = true,
+	Value = getgenv().espEnemies,
 	Callback = function(state)
 		getgenv().espEnemies = state
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -383,7 +450,7 @@ local knifeButton = Kill:Button({
 	Desc = "Kills all players using the knife",
 	Callback = function()
 		getgenv().killButton.knife = true
-		loadModule("mvsd/killall.lua")
+		Modules:Load("mvsd/killall.lua")
 	end,
 })
 
@@ -392,7 +459,7 @@ local gunButton = Kill:Button({
 	Desc = "Kills all players using the gun",
 	Callback = function()
 		getgenv().killButton.gun = true
-		loadModule("mvsd/killall.lua")
+		Modules:Load("mvsd/killall.lua")
 	end,
 })
 
@@ -402,13 +469,13 @@ knifeToggle = Kill:Toggle({
 	Callback = function(state)
 		getgenv().killLoop.knife = state
 		if not state then
-			disconnectModule("mvsd/killall.lua")
+			Modules:Unload("mvsd/killall.lua")
 			lockToggle()
 			return
 		end
 		lockToggle("knife")
-		loadModule("mvsd/killall.lua")
-		saveConfig()
+		Modules:Load("mvsd/killall.lua")
+		Config:Save()
 	end,
 })
 
@@ -418,13 +485,13 @@ gunToggle = Kill:Toggle({
 	Callback = function(state)
 		getgenv().killLoop.gun = state
 		if not state then
-			disconnectModule("mvsd/killall.lua")
+			Modules:Unload("mvsd/killall.lua")
 			lockToggle()
 			return
 		end
 		lockToggle("gun")
-		loadModule("mvsd/killall.lua")
-		saveConfig()
+		Modules:Load("mvsd/killall.lua")
+		Config:Save()
 	end,
 })
 
@@ -434,8 +501,49 @@ local Misc = Window:Tab({
 	Locked = false,
 })
 
+Misc:Section({
+	Title = "Emotes",
+})
+
+refreshAnimations()
+Elements.emoteDrop = Misc:Dropdown({
+	Title = "Emote Selector",
+	Values = emotes,
+	Callback = function(option)
+		resumeAnimation = option
+		playAnimation(option)
+		Config:Save()
+	end,
+})
+
+local emoteInput = Misc:Input({
+	Title = "Add Emote",
+	Desc = "Adds an emote from outside the game",
+	Type = "Input",
+	Placeholder = "rbxassetid://1949963001",
+	Callback = function(input)
+		table.insert(asset, input)
+		refreshAnimations()
+		Elements.emoteDrop:Refresh(emotes)
+		Config:Save()
+	end,
+})
+
+Elements.emoteBind = Misc:Keybind({
+	Title = "Start Emote",
+	Desc = "Keybind to start playing the selected emote",
+	Value = "X",
+	Callback = function(key)
+		playAnimation(resumeAnimation)
+		Config:Save()
+	end,
+})
+
+Misc:Section({
+	Title = "Other",
+})
+
 local crashConnection
-local player = game:GetService("Players").LocalPlayer
 Elements.antiCrash = Misc:Toggle({
 	Title = "Anti Crash",
 	Desc = "Blocks the shroud projectile from rendering",
@@ -445,7 +553,7 @@ Elements.antiCrash = Misc:Toggle({
 			if crashConnection then
 				crashConnection:Disconnect()
 			end
-			saveConfig()
+			Config:Save()
 			return
 		end
 
@@ -461,7 +569,7 @@ Elements.antiCrash = Misc:Toggle({
 				end
 			end)
 		end
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -474,7 +582,7 @@ Elements.lowPoly = Misc:Toggle({
 		updateSetting:FireServer("LowGraphics", state)
 		updateSetting:FireServer("KillEffectsDisabled", state)
 		updateSetting:FireServer("LobbyMusicDisabled", state)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -484,20 +592,15 @@ Elements.autoSpin = Misc:Toggle({
 	Value = false,
 	Callback = function(state)
 		getgenv().autoSpin = state
-		if not state then
-			saveConfig()
-			return
-		end
-
 		spawn(function()
 			while getgenv().autoSpin do
-				if player:GetAttribute("Match") then
+				if not player:GetAttribute("Match") then
 					Replicated.Dailies.Spin:InvokeServer()
 				end
 				wait(0.1)
 			end
 		end)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -520,11 +623,12 @@ Elements.renewerSystem = Controller:Toggle({
 	Value = true,
 	Callback = function(state)
 		if not state then
-			disconnectModule("mvsd/controllers/init.lua")
+			Modules:Unload("mvsd/controllers/init.lua")
+			Config:Save()
 			return
 		end
-		loadModule("mvsd/controllers/init.lua")
-		saveConfig()
+		Modules:Load("mvsd/controllers/init.lua")
+		Config:Save()
 	end,
 })
 
@@ -534,11 +638,12 @@ Elements.knifeController = Controller:Toggle({
 	Value = true,
 	Callback = function(state)
 		if not state then
-			disconnectModule("mvsd/controllers/knife.lua")
+			Modules:Unload("mvsd/controllers/knife.lua")
+			Config:Save()
 			return
 		end
-		loadModule("mvsd/controllers/knife.lua")
-		saveConfig()
+		Modules:Load("mvsd/controllers/knife.lua")
+		Config:Save()
 	end,
 })
 
@@ -548,11 +653,12 @@ Elements.gunController = Controller:Toggle({
 	Value = true,
 	Callback = function(state)
 		if not state then
-			disconnectModule("mvsd/controllers/gun.lua")
+			Modules:Unload("mvsd/controllers/gun.lua")
+			Config:Save()
 			return
 		end
-		loadModule("mvsd/controllers/gun.lua")
-		saveConfig()
+		Modules:Load("mvsd/controllers/gun.lua")
+		Config:Save()
 	end,
 })
 
@@ -563,7 +669,17 @@ local Settings = Window:Tab({
 })
 
 Settings:Section({
-	Title = "General",
+	Title = "Configuration",
+})
+
+Elements.windowBind = Settings:Keybind({
+	Title = "Window toggle",
+	Desc = "Keybind to toggle ui",
+	Value = "X",
+	Callback = function(key)
+		Window:SetToggleKey(Enum.KeyCode[key])
+		Config:Save()
+	end,
 })
 
 local themes = {}
@@ -578,7 +694,7 @@ Elements.themeDrop = Settings:Dropdown({
 	Value = "Dark",
 	Callback = function(option)
 		WindUI:SetTheme(option)
-		saveConfig()
+		Config:Save()
 	end,
 })
 
@@ -622,13 +738,23 @@ local footagesusCredit = Settings:Paragraph({
 	Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox.",
 })
 
+-- Set up character tracking for emotes
+player.CharacterAdded:Connect(handleTracks)
+if player.Character then
+	handleTracks()
+end
+
+default:Set("asset", asset)
 for _, element in pairs(Elements) do
 	default:Register(element.Title, element)
 end
 
 Window:SelectTab(1)
 if isfile(loadFlag) then
-	genv = default:Load()
+	local data = default:Load()
+	asset = data.asset or {}
+	refreshAnimations()
+
 	for _, element in pairs(Elements) do
 		if element.__type == "Dropdown" then
 			element.Callback(element.Value)

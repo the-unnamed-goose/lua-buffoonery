@@ -6,27 +6,26 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local Run = game:GetService("RunService")
 
---[[ Uncomment this paragraph if you want to use the script standalone
-getgenv().aimConfig = {
-	MAX_DISTANCE = 250,
-	MAX_VELOCITY = 40,
-	VISIBLE_PARTS = 4,
-	CAMERA_CAST = true,
-	FOV_CHECK = true,
-	REACTION_TIME = 0.18,
-	ACTION_TIME = 0.32,
-	AUTO_EQUIP = true,
-	EQUIP_LOOP = 0.3,
-	NATIVE_UI = true,
-	DEVIATION_ENABLED = true,
-	BASE_DEVIATION = 2.05,
-	DISTANCE_FACTOR = 0.6,
-	VELOCITY_FACTOR = 0.9,
-	ACCURACY_BUILDUP = 0.14,
-	MIN_DEVIATION = 1,
-	RAYCAST_DISTANCE = 1000,
-}
---]]
+getgenv().aimConfig = getgenv().aimConfig
+	or {
+		MAX_DISTANCE = 250,
+		MAX_VELOCITY = 40,
+		VISIBLE_PARTS = 4,
+		CAMERA_CAST = true,
+		FOV_CHECK = true,
+		REACTION_TIME = 0.18,
+		ACTION_TIME = 0.32,
+		AUTO_EQUIP = true,
+		EQUIP_LOOP = 0.3,
+		NATIVE_UI = true,
+		DEVIATION_ENABLED = true,
+		BASE_DEVIATION = 2.05,
+		DISTANCE_FACTOR = 0.6,
+		VELOCITY_FACTOR = 0.9,
+		ACCURACY_BUILDUP = 0.14,
+		MIN_DEVIATION = 1,
+		RAYCAST_DISTANCE = 1000,
+	}
 
 local WEAPON_TYPE = { GUN = "Gun_Equip", KNIFE = "Knife_Equip" }
 local FOV_ANGLE = math.cos(math.rad(45))
@@ -49,7 +48,6 @@ local knifeController = require(modules:WaitForChild("KnifeProjectileController"
 getgenv().controller = {}
 getgenv().controller.lock = { gun = false, knife = false, general = false }
 getgenv().controller.gunCooldown = 0
-local progressTween
 
 local raycastParams = RaycastParams.new()
 raycastParams.IgnoreWater = true
@@ -68,6 +66,7 @@ local equipTimer = 0
 local shotCount = 0
 local accuracyBonus = 0
 local lastShotTime = 0
+local progressTween
 
 local playerCache = {}
 local function initializePlayer()
@@ -81,7 +80,12 @@ local function initializePlayer()
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum and hum:WaitForChild("Animator")
 
-	playerCache = { char, hrp, hum, animator }
+	playerCache = {
+		char = char,
+		hrp = hrp,
+		humanoid = hum,
+		animator = animator,
+	}
 end
 
 local function normalRandom()
@@ -153,8 +157,8 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	local deviatedDirection = (tempDir * cosV + up * sinV).Unit
 
 	local safeFilterList = {}
-	if playerCache[1] and playerCache[1].Parent then
-		table.insert(safeFilterList, playerCache[1])
+	if playerCache.char and playerCache.char.Parent then
+		table.insert(safeFilterList, playerCache.char)
 	end
 
 	misfireRayParams.FilterDescendantsInstances = safeFilterList
@@ -174,7 +178,7 @@ local function predictTargetPoint(targetHrp)
 	local currentPos = targetHrp.Position
 	local rayOrigin = Vector3.new(currentPos.X, currentPos.Y + 15, currentPos.Z)
 
-	groundRayParams.FilterDescendantsInstances = { targetHrp.Parent, playerCache[1] }
+	groundRayParams.FilterDescendantsInstances = { targetHrp.Parent, playerCache.char }
 	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -80, 0), groundRayParams)
 
 	if rayResult then
@@ -229,13 +233,13 @@ local function isValidTarget(targetPlayer, localHrp)
 end
 
 local function getVisibleParts(targetChar, localHrp)
-	if not targetChar.Parent or not playerCache[1] or not playerCache[1].Parent then
+	if not targetChar.Parent or not playerCache.char or not playerCache.char.Parent then
 		return {}
 	end
 
 	local visibleParts = {}
 	local cameraPos = camera.CFrame.Position
-	raycastParams.FilterDescendantsInstances = { playerCache[1], targetChar }
+	raycastParams.FilterDescendantsInstances = { playerCache.char, targetChar }
 
 	for _, part in ipairs(targetChar:GetChildren()) do
 		if part:IsA("BasePart") then
@@ -276,11 +280,11 @@ local function getVisibleParts(targetChar, localHrp)
 end
 
 local function getWeapon(weaponType)
-	if not playerCache[1] or not playerCache[1].Parent then
+	if not playerCache.char or not playerCache.char.Parent then
 		return
 	end
 
-	for _, tool in ipairs(playerCache[1]:GetChildren()) do
+	for _, tool in ipairs(playerCache.char:GetChildren()) do
 		if tool:IsA("Tool") and (not weaponType or tool:GetAttribute("EquipAnimation") == weaponType) then
 			return tool
 		end
@@ -307,8 +311,8 @@ local function findBestTarget(localHrp)
 
 						local priorityPart = nil
 						for _, part in ipairs(visible) do
-							local partName = part.Name:lower()
-							if partName:find("uppertorso") or partName:find("humanoidrootpart") then
+							local partName = part.Name
+							if partName == "UpperTorso" or partName == "HumanoidRootPart" then
 								priorityPart = part
 								break
 							end
@@ -416,13 +420,17 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 		return
 	end
 
+	local muzzlePos = muzzle.WorldPosition
+	local animTrack = animator:LoadAnimation(shootAnim)
+	local sound = gun:FindFirstChild("Fire")
+
 	local targetChar = hitPart and hitPart.Parent
 	if targetChar then
 		local visibleParts = getVisibleParts(targetChar, localHrp)
 		if #visibleParts >= getgenv().aimConfig.VISIBLE_PARTS then
 			for _, part in ipairs(visibleParts) do
-				local lowerName = part.Name:lower()
-				if lowerName:find("uppertorso") or lowerName:find("humanoidrootpart") then
+				local partName = part.Name
+				if partName == "UpperTorso" or partName == "HumanoidRootPart" then
 					hitPart = part
 					targetPos = part.Position
 					break
@@ -431,16 +439,10 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 		end
 	end
 
-	local muzzlePos = muzzle.WorldPosition
 	local finalPos, actualHitPart = applyAimDeviation(targetPos, muzzlePos, targetChar)
 
-	local animTrack = animator:LoadAnimation(shootAnim)
 	animTrack:Play()
-
-	local sound = gun:FindFirstChild("Fire")
-	if sound then
-		sound:Play()
-	end
+	sound:Play()
 
 	bulletRenderer(muzzlePos, finalPos, "Default")
 	shootRemote:FireServer(muzzlePos, finalPos, actualHitPart or hitPart, finalPos)
@@ -487,7 +489,7 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 		KnifeProjectile = handle:Clone(),
 		Direction = direction,
 		Origin = localHrp.Position,
-		IgnoreCharacter = playerCache[1],
+		IgnoreCharacter = playerCache.char,
 	}, function(result)
 		if result and result.Instance then
 			throwHitRemote:FireServer(result.Instance, result.Position)
@@ -498,14 +500,14 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 end
 
 local function equipWeapon(weaponType, callback)
-	if not playerCache[1] then
+	if not playerCache.char then
 		if callback then
 			callback(false, "No character")
 		end
 		return
 	end
 
-	local humanoid = playerCache[3]
+	local humanoid = playerCache.humanoid
 	if not humanoid then
 		if callback then
 			callback(false, "No humanoid")
@@ -540,9 +542,9 @@ local function equipWeapon(weaponType, callback)
 	end
 
 	if
-		Collection:HasTag(playerCache[1], "Invulnerable")
-		or Collection:HasTag(playerCache[1], "CombatDisabled")
-		or Collection:HasTag(playerCache[1], "SpeedTrail")
+		Collection:HasTag(playerCache.char, "Invulnerable")
+		or Collection:HasTag(playerCache.char, "CombatDisabled")
+		or Collection:HasTag(playerCache.char, "SpeedTrail")
 	then
 		return
 	end
@@ -589,14 +591,14 @@ local function handleAutoEquip()
 		return
 	end
 
-	if not playerCache[1] or not playerCache[1].Parent then
+	if not playerCache.char or not playerCache.char.Parent then
 		return
 	end
 
 	if
-		Collection:HasTag(playerCache[1], "Invulnerable")
-		or Collection:HasTag(playerCache[1], "CombatDisabled")
-		or Collection:HasTag(playerCache[1], "SpeedTrail")
+		Collection:HasTag(playerCache.char, "Invulnerable")
+		or Collection:HasTag(playerCache.char, "CombatDisabled")
+		or Collection:HasTag(playerCache.char, "SpeedTrail")
 	then
 		return
 	end
@@ -649,7 +651,7 @@ local function handleAutoEquip()
 end
 
 local function handleCombat()
-	local char, hrp, humanoid, animator = playerCache[1], playerCache[2], playerCache[3], playerCache[4]
+	local char, hrp, humanoid, animator = playerCache.char, playerCache.hrp, playerCache.humanoid, playerCache.animator
 	if not char or not hrp or not humanoid or not animator then
 		return
 	end
