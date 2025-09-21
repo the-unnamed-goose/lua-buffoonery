@@ -623,6 +623,16 @@ Settings:Section({
 	Title = "Configuration",
 })
 
+Elements.windowBind = Settings:Keybind({
+	Title = "Window toggle",
+	Desc = "Keybind to toggle ui",
+	Value = "X",
+	Callback = function(key)
+		Window:SetToggleKey(Enum.KeyCode[key])
+		Config:Save()
+	end,
+})
+
 local themes = {}
 for theme in pairs(Windui:GetThemes()) do
 	table.insert(themes, theme)
