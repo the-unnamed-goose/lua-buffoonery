@@ -1,21 +1,33 @@
--- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
+-- This file is licensed under the Perl Artistic License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
-local Run = game:GetService("RunService")
-local Input = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local UserInput = game:GetService("UserInputService")
 
 local camera = workspace.CurrentCamera
-local localPlayer = Players.LocalPlayer
+local player = Players.LocalPlayer
 
 getgenv().aimConfig = getgenv().aimConfig
 	or {
 		targetPart = "Head",
-		fovDeg = 15,
+		aimMode = "camera",
+
+		fovDeg = 25,
 		triggerFovDeg = 2,
 		smoothness = 0.25,
-		prediction = 0.05,
+		prediction = 0.02,
 		maxDistance = 500,
+
+		jitterEnabled = true,
+		jitterIntensity = 0.3,
+		jitterFrequency = 2.0,
+		jitterPattern = "circular",
+		jitterScale = 0.5,
+		maxJitterOffset = 3.0,
+
 		useRay = true,
 		respectTeams = false,
+		lockCamera = true,
+
 		triggerBot = true,
 		triggerMode = "button",
 		triggerAction = nil,
@@ -23,41 +35,146 @@ getgenv().aimConfig = getgenv().aimConfig
 	}
 
 local currentTarget = nil
-local lastTargetTime = 0
-local connection = nil
-local lastAimDirection = camera.CFrame.LookVector
 local targetSwitchProgress = 0
 local targetSwitchDuration = 0.3
+local jitterTime = 0
+local lastJitterOffset = Vector3.zero
+local perlinSeed = math.random(1, 10000)
+local cameraHook
 
-local function isValid(player)
-	if player == localPlayer then
+task.spawn(function()
+	cameraHook = hookmetamethod(
+		camera,
+		"__newindex",
+		newcclosure(function(self, key, value, ...)
+			if not checkcaller() and getthreadidentity() < 3 and key == "CFrame" then
+				if currentTarget and getgenv().aimConfig.lockCamera then
+					local rotation = camera.CFrame - camera.CFrame.Position
+					return cameraHook(self, key, rotation + value.Position, ...)
+				end
+			end
+			return cameraHook(self, key, value, ...)
+		end)
+	)
+end)
+
+local function perlinNoise(x, y, seed)
+	local X = math.floor(x) or 255
+	local Y = math.floor(y) or 255
+	x = x - math.floor(x)
+	y = y - math.floor(y)
+
+	local u = x * x * x * (x * (x * 6 - 15) + 10)
+	local v = y * y * y * (y * (y * 6 - 15) + 10)
+
+	local A = (seed + X) or 255
+	local B = (seed + X + 1) or 255
+	local AA = (seed + A + Y) or 255
+	local AB = (seed + A + Y + 1) or 255
+	local BA = (seed + B + Y) or 255
+	local BB = (seed + B + Y + 1) or 255
+
+	local grad = function(hash, x, y)
+		local h = hash or 3
+		local u = h == 0 and x or y
+		local v = h == 0 and y or x
+		return ((h or 2) == 0 and u or -u) + ((h or 1) == 0 and v or -v)
+	end
+
+	return math.clamp(
+		math.lerp(
+			math.lerp(grad(AA, x, y), grad(BA, x - 1, y), u),
+			math.lerp(grad(AB, x, y - 1), grad(BB, x - 1, y - 1), u),
+			v
+		) * 1.5,
+		-1,
+		1
+	)
+end
+
+local function getJitterOffset(deltaTime, distance)
+	local config = getgenv().aimConfig
+	if not config.jitterEnabled or config.jitterIntensity <= 0 then
+		return Vector3.zero
+	end
+
+	jitterTime = jitterTime + deltaTime
+
+	local distanceScale = math.clamp(1 - (distance / config.maxDistance) * config.jitterScale, 0.1, 1.0)
+	local intensity = config.jitterIntensity * distanceScale
+	local maxOffsetRad = math.rad(config.maxJitterOffset) * intensity
+
+	local jitterX, jitterY = 0, 0
+
+	if config.jitterPattern == "perlin" then
+		local timeScaled = jitterTime * config.jitterFrequency
+		jitterX = perlinNoise(timeScaled, perlinSeed, perlinSeed) * maxOffsetRad
+		jitterY = perlinNoise(timeScaled + 100, perlinSeed + 100, perlinSeed) * maxOffsetRad
+	elseif config.jitterPattern == "circular" then
+		local angle = jitterTime * config.jitterFrequency * 2 * math.pi
+		local radius = maxOffsetRad * 0.7
+		jitterX = math.cos(angle) * radius
+		jitterY = math.sin(angle * 1.3) * radius * 0.8
+	else
+		if jitterTime % (0.5 / config.jitterFrequency) < deltaTime then
+			lastJitterOffset =
+				Vector3.new((math.random() * 2 - 1) * maxOffsetRad, (math.random() * 2 - 1) * maxOffsetRad, 0)
+		end
+		jitterX = lastJitterOffset.X
+		jitterY = lastJitterOffset.Y
+	end
+
+	local easeFactor = math.min(deltaTime * 10, 1)
+	jitterX = math.lerp(lastJitterOffset.X, jitterX, easeFactor)
+	jitterY = math.lerp(lastJitterOffset.Y, jitterY, easeFactor)
+
+	lastJitterOffset = Vector3.new(jitterX, jitterY, 0)
+	return lastJitterOffset
+end
+
+local function applyJitter(direction, jitterOffset)
+	if jitterOffset == Vector3.zero then
+		return direction
+	end
+
+	local right = direction:Cross(Vector3.new(0, 1, 0)).Unit
+	local up = right:Cross(direction).Unit
+
+	local jittered = direction + right * jitterOffset.X + up * jitterOffset.Y
+	return jittered.Unit
+end
+
+local function isValid(target)
+	if target == player then
 		return false
 	end
 
-	if getgenv().aimConfig.respectTeams and localPlayer.Team and player.Team == localPlayer.Team then
+	local config = getgenv().aimConfig
+	if config.respectTeams and target.Team and target.Team == player.Team then
 		return false
 	end
 
-	local character = player.Character
+	local character = target.Character
 	if not character then
 		return false
 	end
 
 	local humanoid = character:FindFirstChild("Humanoid")
-	local targetPart = character:FindFirstChild(getgenv().aimConfig.targetPart)
+	local targetPart = character:FindFirstChild(config.targetPart)
 
-	if humanoid and humanoid.Health > 0 and targetPart then
-		local localCharacter = localPlayer.Character
-		if localCharacter then
-			local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
-			if humanoidRootPart then
-				return targetPart.Position.Y > (humanoidRootPart.Position.Y - 0.5)
-			end
-		end
-		return true
+	if not (humanoid and humanoid.Health > 0 and targetPart) then
+		return false
 	end
 
-	return false
+	local localChar = player.Character
+	if localChar then
+		local root = localChar:FindFirstChild("HumanoidRootPart")
+		if root then
+			return targetPart.Position.Y > (root.Position.Y - 0.5)
+		end
+	end
+
+	return true
 end
 
 local function isVisible(character, part)
@@ -66,19 +183,19 @@ local function isVisible(character, part)
 	end
 
 	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = { localPlayer.Character, camera }
+	rayParams.FilterDescendantsInstances = { player.Character, camera }
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 	rayParams.IgnoreWater = true
 
-	local rayDirection = part.Position - camera.CFrame.Position
-	local rayResult = workspace:Raycast(camera.CFrame.Position, rayDirection, rayParams)
+	local rayDir = part.Position - camera.CFrame.Position
+	local result = workspace:Raycast(camera.CFrame.Position, rayDir, rayParams)
 
-	return not rayResult or rayResult.Instance:IsDescendantOf(character)
+	return not result or result.Instance:IsDescendantOf(character)
 end
 
 local function findTarget()
 	local config = getgenv().aimConfig
-	local camPosition = camera.CFrame.Position
+	local camPos = camera.CFrame.Position
 	local camLook = camera.CFrame.LookVector
 	local bestTarget = nil
 	local bestDot = -1
@@ -94,7 +211,7 @@ local function findTarget()
 			continue
 		end
 
-		local distance = (camPosition - part.Position).Magnitude
+		local distance = (camPos - part.Position).Magnitude
 		if distance > config.maxDistance then
 			continue
 		end
@@ -103,27 +220,27 @@ local function findTarget()
 			continue
 		end
 
-		local partPosition = part.Position
+		local partPos = part.Position
 		if config.prediction > 0 then
-			local rootPart = character:FindFirstChild("HumanoidRootPart")
-			if rootPart then
-				partPosition = partPosition + rootPart.Velocity * config.prediction
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if root then
+				partPos = partPos + root.Velocity * config.prediction
 			end
 		end
 
-		local direction = (partPosition - camPosition).Unit
-		local dotProduct = camLook:Dot(direction)
-		local fovCheck = dotProduct > math.cos(math.rad(config.fovDeg))
+		local dir = (partPos - camPos).Unit
+		local dot = camLook:Dot(dir)
+		local fovCheck = dot > math.cos(math.rad(config.fovDeg))
 
-		if fovCheck and dotProduct > bestDot then
-			bestDot = dotProduct
+		if fovCheck and dot > bestDot then
+			bestDot = dot
 			bestTarget = {
 				player = player,
 				character = character,
 				part = part,
-				position = partPosition,
+				position = partPos,
 				distance = distance,
-				dotProduct = dotProduct,
+				dotProduct = dot,
 			}
 		end
 	end
@@ -131,20 +248,20 @@ local function findTarget()
 	return bestTarget
 end
 
-local function isAimable(target)
+local function canAim(target)
 	if not target then
 		return false
 	end
 
-	local camPosition = camera.CFrame.Position
+	local camPos = camera.CFrame.Position
 	local camLook = camera.CFrame.LookVector
-	local targetPosition = target.position
+	local targetPos = target.position
 
-	local direction = (targetPosition - camPosition).Unit
-	local dotProduct = camLook:Dot(direction)
-	local triggerFovCheck = dotProduct > math.cos(math.rad(getgenv().aimConfig.triggerFovDeg))
+	local dir = (targetPos - camPos).Unit
+	local dot = camLook:Dot(dir)
+	local triggerFov = dot > math.cos(math.rad(getgenv().aimConfig.triggerFovDeg))
 
-	return triggerFovCheck and isVisible(target.character, target.part)
+	return triggerFov and isVisible(target.character, target.part)
 end
 
 local function trigger()
@@ -155,11 +272,12 @@ local function trigger()
 	local closure = getgenv().aimConfig.triggerClosure
 	local mode = getgenv().aimConfig.triggerMode
 	local element = getgenv().aimConfig.triggerAction
+
 	if mode == "mouse1" then
 		mouse1click()
 	elseif mode == "mouse2" then
 		mouse2click()
-	elseif mode == "closure" and closure and type(closure) == "function" then
+	elseif mode == "closure" and type(closure) == "function" then
 		closure()
 	elseif element then
 		if element:IsA("ClickDetector") and element.MouseClick then
@@ -178,27 +296,61 @@ local function trigger()
 	end
 end
 
-local function smoothAim(targetPosition, deltaTime, isNewTarget)
-	local camPosition = camera.CFrame.Position
-	local desiredLook = (targetPosition - camPosition).Unit
+local function aimAt(targetPos, deltaTime, isNewTarget)
+	local config = getgenv().aimConfig
 
-	if isNewTarget then
-		targetSwitchProgress = 0
+	if config.aimMode == "mouse" then
+		local camPos = camera.CFrame.Position
+		local screenPoint, visible = camera:WorldToScreenPoint(targetPos)
+		if visible then
+			local viewport = camera.ViewportSize
+			local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
+			local targetScreen = Vector2.new(screenPoint.X, screenPoint.Y)
+
+			local delta = targetScreen - center
+
+			if isNewTarget then
+				targetSwitchProgress = 0
+			else
+				targetSwitchProgress = math.min(targetSwitchProgress + deltaTime / targetSwitchDuration, 1)
+			end
+
+			local smooth = config.smoothness * deltaTime * 60
+			local ease = 1 - math.cos(targetSwitchProgress * math.pi * 0.5)
+			local blend = math.min(smooth + ease * 0.5, 1)
+
+			local smoothed = delta * blend
+			mousemoverel(smoothed.X, smoothed.Y)
+		end
 	else
-		targetSwitchProgress = math.min(targetSwitchProgress + deltaTime / targetSwitchDuration, 1)
+		local currentCF = camera.CFrame
+		local camPos = currentCF.Position
+
+		local desiredLook = (targetPos - camPos).Unit
+		local distance = (targetPos - camPos).Magnitude
+		local jitter = getJitterOffset(deltaTime, distance)
+		local jitteredLook = applyJitter(desiredLook, jitter)
+
+		if isNewTarget then
+			targetSwitchProgress = 0
+		else
+			targetSwitchProgress = math.min(targetSwitchProgress + deltaTime / targetSwitchDuration, 1)
+		end
+
+		local smooth = config.smoothness * deltaTime * 60
+		local ease = 1 - math.cos(targetSwitchProgress * math.pi * 0.5)
+
+		local currentLook = currentCF.LookVector
+		local smoothedLook = currentLook:Lerp(jitteredLook, smooth + ease * 0.5)
+
+		if config.lockCamera and currentTarget then
+			camera.CFrame = CFrame.new(camPos, camPos + smoothedLook)
+		else
+			camera.CFrame = CFrame.new(camPos, camPos + smoothedLook)
+		end
 	end
-
-	local smoothFactor = getgenv().aimConfig.smoothness * deltaTime * 60
-	local switchEase = 1 - math.cos(targetSwitchProgress * math.pi * 0.5)
-
-	local currentLook = camera.CFrame.LookVector
-	local smoothedLook = currentLook:Lerp(desiredLook, smoothFactor + switchEase * 0.5)
-
-	lastAimDirection = smoothedLook
-	camera.CFrame = CFrame.new(camPosition, camPosition + smoothedLook)
 end
 
--- I miss Rust ...
 local function main(deltaTime)
 	local config = getgenv().aimConfig
 	if not config then
@@ -206,28 +358,29 @@ local function main(deltaTime)
 	end
 
 	local newTarget = findTarget()
-	local isNewTarget = false
+	local isNew = false
 
 	if newTarget then
 		if not currentTarget or newTarget.player ~= currentTarget.player then
-			isNewTarget = true
+			isNew = true
 			currentTarget = newTarget
-			lastTargetTime = tick()
 		else
 			currentTarget = newTarget
 		end
 	else
 		currentTarget = nil
 		targetSwitchProgress = 0
+		jitterTime = 0
+		lastJitterOffset = Vector3.zero
 	end
 
 	if currentTarget then
-		smoothAim(currentTarget.position, deltaTime, isNewTarget)
+		aimAt(currentTarget.position, deltaTime, isNew)
 
-		if isAimable(currentTarget) then
+		if canAim(currentTarget) then
 			trigger()
 		end
 	end
 end
 
-return Run.RenderStepped:Connect(main)
+return RunService:BindToRenderStep("Camera", math.huge, main)

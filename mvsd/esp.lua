@@ -89,7 +89,6 @@ local Connections = {}
 Connections[0] = player.CharacterAdded:Connect(update)
 Connections[1] = Run.Heartbeat:Connect(function()
 	if not player:GetAttribute("Match") then
-		print("e1")
 		return
 	end
 

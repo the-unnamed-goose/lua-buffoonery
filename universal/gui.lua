@@ -1,20 +1,33 @@
 -- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
 local Input = game:GetService("UserInputService")
-local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+local RunService = game:GetService("RunService")
+local Windui = loadstring(
+	isfile("Wildcard/windui.lua") and readfile("Wildcard/windui.lua")
+		or game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+)()
+--local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+local Repository = "http://localhost:8000/"
 
 getgenv().aimConfig = getgenv().aimConfig
 	or {
 		enabled = false,
-		fovDeg = 15,
-		triggerFovDeg = 2,
 		targetPart = "Head",
+		aimMode = "camera",
+		fovDeg = 25,
+		triggerFovDeg = 2,
 		smoothness = 0.25,
-		prediction = 0.05,
+		prediction = 0.02,
 		maxDistance = 500,
+		jitterEnabled = true,
+		jitterIntensity = 0.3,
+		jitterFrequency = 2.0,
+		jitterPattern = "circular",
+		jitterScale = 0.5,
+		maxJitterOffset = 3.0,
 		useRay = true,
 		respectTeams = false,
+		lockCamera = true,
 		triggerBot = true,
 		triggerMode = "button",
 		triggerAction = nil,
@@ -36,11 +49,30 @@ getgenv().espConfig = getgenv().espConfig
 		textSize = 14,
 	}
 
+getgenv().bypassConfig = getgenv().bypassConfig
+	or {
+		enabled = false,
+		core = true,
+		memory = true,
+		market = true,
+		parent = true,
+		garbage = true,
+		message = true,
+		analytics = true,
+		property = false,
+
+		raw = false,
+		debug = false,
+		proxy = false,
+		memoryleak = false,
+		environment = false,
+	}
+
 local Window = Windui:CreateWindow({
 	Title = "Wildcard",
 	Icon = "asterisk",
 	Author = "by Le Honk",
-	Folder = "Universal",
+	Folder = "Wildcard",
 	Theme = "Dark",
 	Size = UDim2.fromOffset(580, 100),
 	Resizable = true,
@@ -49,9 +81,8 @@ local Window = Windui:CreateWindow({
 
 local Config = Window.ConfigManager
 local default = Config:CreateConfig("default")
-local saveFlag = "WindUI/" .. Window.Folder .. "/config/autosave"
-local loadFlag = "WindUI/" .. Window.Folder .. "/config/autoload"
-local Elements = {}
+local saveFlag = Window.Folder .. "/config/autosave"
+local loadFlag = Window.Folder .. "/config/autoload"
 
 local asset = {}
 local animation = {}
@@ -61,10 +92,19 @@ local animator
 local track
 
 local player = Players.LocalPlayer
-local elementList = {}
 local nameList = {}
 local isCapturing = false
 local connections = {}
+local elementCache = {}
+
+local function warnUser()
+	Windui:Notify({
+		Title = "Warning",
+		Content = "Changing the default config might open you up to detections and or loss of functionality, proceed with caution!",
+		Duration = 6,
+		Icon = "triangle-alert",
+	})
+end
 
 local function refreshAnimations()
 	if not player.Character then
@@ -108,30 +148,43 @@ local function isElement(object)
 	return object:IsA("TextButton") or object:IsA("ImageButton") or object:IsA("Tool") or object:IsA("ClickDetector")
 end
 
+local function getElementPath(element)
+	local path = {}
+	local current = element
+	while current and current ~= game do
+		table.insert(path, 1, current.Name)
+		current = current.Parent
+	end
+	return table.concat(path, ".")
+end
+
 local function connectElement(element)
 	if isElement(element) then
 		local connection
 		local className = element.ClassName
+		local elementPath = getElementPath(element)
 
 		if className == "TextButton" or className == "ImageButton" or className == "Tool" then
 			connection = element.Activated:Connect(function()
 				if isCapturing then
 					isCapturing = false
-					if not table.find(elementList, element) then
+					if not elementCache[elementPath] then
 						local displayName
 						if className == "TextButton" or className == "ImageButton" then
 							displayName = "[BTN] " .. element.Name
 						elseif className == "Tool" then
 							displayName = "[TOOL] " .. element.Name
 						end
-						elementList[displayName] = element
+						elementCache[elementPath] = {
+							element = element,
+							displayName = displayName,
+							path = elementPath
+						}
 						table.insert(nameList, displayName)
 
-						getgenv().aimConfig.triggerAction = element
-						Elements.triggerDrop:Refresh(nameList)
+						getgenv().aimConfig.triggerAction = elementPath
 					end
 
-					Elements.triggerDrop:Select(element.Name)
 					Window:Open()
 				end
 			end)
@@ -139,19 +192,21 @@ local function connectElement(element)
 			connection = element.MouseClick:Connect(function()
 				if isCapturing then
 					isCapturing = false
-					if not table.find(elementList, element) then
+					if not elementCache[elementPath] then
 						local displayName = "[CLK] " .. element.Name
 						if element.Parent then
 							displayName = displayName .. " (on " .. element.Parent.Name .. ")"
 						end
-						elementList[displayName] = element
+						elementCache[elementPath] = {
+							element = element,
+							displayName = displayName,
+							path = elementPath
+						}
 						table.insert(nameList, displayName)
 
-						getgenv().aimConfig.triggerAction = element
-						Elements.triggerDrop:Refresh(nameList)
+						getgenv().aimConfig.triggerAction = elementPath
 					end
 
-					Elements.triggerDrop:Select(element.Name)
 					Window:Open()
 				end
 			end)
@@ -194,6 +249,31 @@ local function scanElements()
 	end
 end
 
+local function resolveElement(path)
+	if elementCache[path] and elementCache[path].element and elementCache[path].element.Parent then
+		return elementCache[path].element
+	end
+	
+	local current = game
+	for part in path:gmatch("[^%.]+") do
+		current = current:FindFirstChild(part)
+		if not current then
+			return nil
+		end
+	end
+	
+	if isElement(current) then
+		elementCache[path] = {
+			element = current,
+			displayName = elementCache[path] and elementCache[path].displayName or current.Name,
+			path = path
+		}
+		return current
+	end
+	
+	return nil
+end
+
 local function getParts()
 	local parts = {}
 	local character = player.Character
@@ -219,6 +299,15 @@ local function handleTracks()
 	end)
 end
 
+local function updateTriggerAction()
+	if getgenv().aimConfig.triggerAction and type(getgenv().aimConfig.triggerAction) == "string" then
+		local element = resolveElement(getgenv().aimConfig.triggerAction)
+		if element then
+			getgenv().aimConfig.triggerAction = element
+		end
+	end
+end
+
 function Config:Save()
 	if isfile(saveFlag) then
 		default:Save()
@@ -231,7 +320,14 @@ function Modules:Load(file)
 		return Modules[file]
 	end
 
-	_, Modules[file] = pcall(loadstring(game:HttpGet(Repository .. file)))
+	local cache = Window.Folder .. "/" .. file
+	local content = isfile(cache) and readfile(cache)
+	if not content then
+		content = game:HttpGet(Repository .. file)
+		writefile(cache, content)
+	end
+	
+	_, Modules[file] = pcall(loadstring(content))
 end
 
 function Modules:Unload(moduleName)
@@ -262,11 +358,12 @@ Aim:Section({
 	Title = "General",
 })
 
-Elements.aimToggle = Aim:Toggle({
+Aim:Toggle({
 	Title = "Aim Bot",
 	Desc = "Enable/Disable AimBot",
 	Value = getgenv().aimConfig.enabled,
 	Callback = function(state)
+		getgenv().aimConfig.enabled = state
 		if not state then
 			Modules:Unload("universal/aimbot.lua")
 			return
@@ -276,8 +373,27 @@ Elements.aimToggle = Aim:Toggle({
 	end,
 })
 
-Elements.fovSlider = Aim:Slider({
+Aim:Dropdown({
+	Title = "Aim Mode",
+	Values = { "camera", "mouse", "character" },
+	Value = getgenv().aimConfig.aimMode,
+	Callback = function(option)
+		getgenv().aimConfig.aimMode = option
+		if option == "character" then
+			Windui:Notify({
+				Title = "Info",
+				Content = "Character mode may be detectable in some games. Use with caution.",
+				Duration = 5,
+				Icon = "circle-alert",
+			})
+		end
+		Config:Save()
+	end,
+})
+
+Aim:Slider({
 	Title = "FOV Degrees",
+	Step = 1,
 	Value = {
 		Min = 1,
 		Max = 90,
@@ -289,8 +405,9 @@ Elements.fovSlider = Aim:Slider({
 	end,
 })
 
-Elements.triggerFovSlider = Aim:Slider({
+Aim:Slider({
 	Title = "Trigger FOV Degrees",
+	Step = 1,
 	Value = {
 		Min = 1,
 		Max = 30,
@@ -302,7 +419,7 @@ Elements.triggerFovSlider = Aim:Slider({
 	end,
 })
 
-Elements.smoothnessSlider = Aim:Slider({
+Aim:Slider({
 	Title = "Smoothness",
 	Step = 0.01,
 	Value = {
@@ -316,7 +433,7 @@ Elements.smoothnessSlider = Aim:Slider({
 	end,
 })
 
-Elements.predictionSlider = Aim:Slider({
+Aim:Slider({
 	Title = "Prediction",
 	Step = 0.01,
 	Value = {
@@ -330,8 +447,9 @@ Elements.predictionSlider = Aim:Slider({
 	end,
 })
 
-Elements.maxDistanceSlider = Aim:Slider({
+Aim:Slider({
 	Title = "Max Distance",
+	Step = 1,
 	Value = {
 		Min = 50,
 		Max = 2000,
@@ -343,7 +461,7 @@ Elements.maxDistanceSlider = Aim:Slider({
 	end,
 })
 
-Elements.partDrop = Aim:Dropdown({
+Aim:Dropdown({
 	Title = "Target Part",
 	Values = getParts(),
 	Value = getgenv().aimConfig.targetPart,
@@ -353,7 +471,7 @@ Elements.partDrop = Aim:Dropdown({
 	end,
 })
 
-Elements.visibilityToggle = Aim:Toggle({
+Aim:Toggle({
 	Title = "Visibility Check",
 	Desc = "Only target visible enemies",
 	Value = getgenv().aimConfig.useRay,
@@ -363,7 +481,7 @@ Elements.visibilityToggle = Aim:Toggle({
 	end,
 })
 
-Elements.teamToggle = Aim:Toggle({
+Aim:Toggle({
 	Title = "Team Check",
 	Desc = "Don't target teammates",
 	Value = getgenv().aimConfig.respectTeams,
@@ -373,11 +491,101 @@ Elements.teamToggle = Aim:Toggle({
 	end,
 })
 
+Aim:Toggle({
+	Title = "Lock Camera",
+	Desc = "Lock camera to target when aiming",
+	Value = getgenv().aimConfig.lockCamera,
+	Callback = function(state)
+		getgenv().aimConfig.lockCamera = state
+		Config:Save()
+	end,
+})
+
+Aim:Section({
+	Title = "Jitter Settings",
+})
+
+Aim:Toggle({
+	Title = "Jitter",
+	Desc = "Add random movement to aim",
+	Value = getgenv().aimConfig.jitterEnabled,
+	Callback = function(state)
+		getgenv().aimConfig.jitterEnabled = state
+		Config:Save()
+	end,
+})
+
+Aim:Slider({
+	Title = "Jitter Intensity",
+	Step = 0.01,
+	Value = {
+		Min = 0,
+		Max = 1,
+		Default = getgenv().aimConfig.jitterIntensity,
+	},
+	Callback = function(val)
+		getgenv().aimConfig.jitterIntensity = tonumber(val)
+		Config:Save()
+	end,
+})
+
+Aim:Slider({
+	Title = "Jitter Frequency",
+	Step = 0.1,
+	Value = {
+		Min = 0.1,
+		Max = 10,
+		Default = getgenv().aimConfig.jitterFrequency,
+	},
+	Callback = function(val)
+		getgenv().aimConfig.jitterFrequency = tonumber(val)
+		Config:Save()
+	end,
+})
+
+Aim:Dropdown({
+	Title = "Jitter Pattern",
+	Values = { "circular", "random", "sine", "square" },
+	Value = getgenv().aimConfig.jitterPattern,
+	Callback = function(option)
+		getgenv().aimConfig.jitterPattern = option
+		Config:Save()
+	end,
+})
+
+Aim:Slider({
+	Title = "Jitter Scale",
+	Step = 0.01,
+	Value = {
+		Min = 0,
+		Max = 2,
+		Default = getgenv().aimConfig.jitterScale,
+	},
+	Callback = function(val)
+		getgenv().aimConfig.jitterScale = tonumber(val)
+		Config:Save()
+	end,
+})
+
+Aim:Slider({
+	Title = "Max Jitter Offset",
+	Step = 0.1,
+	Value = {
+		Min = 0,
+		Max = 10,
+		Default = getgenv().aimConfig.maxJitterOffset,
+	},
+	Callback = function(val)
+		getgenv().aimConfig.maxJitterOffset = tonumber(val)
+		Config:Save()
+	end,
+})
+
 Aim:Section({
 	Title = "Trigger Bot",
 })
 
-Elements.triggerToggle = Aim:Toggle({
+Aim:Toggle({
 	Title = "Trigger Bot",
 	Desc = "Enable/Disable automatic firing",
 	Value = getgenv().aimConfig.triggerBot,
@@ -387,11 +595,12 @@ Elements.triggerToggle = Aim:Toggle({
 	end,
 })
 
-Elements.triggerModeDrop = Aim:Dropdown({
+Aim:Dropdown({
 	Title = "Trigger Mode",
 	Values = { "mouse1", "mouse2", "button", "closure" },
 	Value = getgenv().aimConfig.triggerMode,
 	Callback = function(option)
+		getgenv().aimConfig.triggerMode = option
 		if string.find(option, "mouse") and not Input.MouseEnabled then
 			Windui:Notify({
 				Title = "Warning",
@@ -409,13 +618,11 @@ Elements.triggerModeDrop = Aim:Dropdown({
 				Icon = "circle-alert",
 			})
 		end
-
-		getgenv().aimConfig.triggerMode = option
 		Config:Save()
 	end,
 })
 
-Elements.captureButton = Aim:Button({
+Aim:Button({
 	Title = "Capture Button",
 	Desc = "Hide UI and click the button you want to use as trigger",
 	Callback = function()
@@ -431,17 +638,103 @@ Elements.captureButton = Aim:Button({
 	end,
 })
 
-Elements.triggerDrop = Aim:Dropdown({
+local triggerDropValues = { "Press 'Capture Button' first" }
+if nameList and #nameList > 0 then
+	triggerDropValues = nameList
+end
+
+Aim:Dropdown({
 	Title = "Trigger Button",
-	Values = { "Press 'Capture Button' first" },
-	SearchBarEnabled = true,
+	Values = triggerDropValues,
+	Value = getgenv().aimConfig.triggerAction,
 	Callback = function(option)
-		if elementList and elementList[option] then
-			getgenv().aimConfig.triggerAction = elementList[option]
+		if elementCache then
+			for _, cached in pairs(elementCache) do
+				if cached.displayName == option then
+					getgenv().aimConfig.triggerAction = cached.path
+					break
+				end
+			end
 		end
 		Config:Save()
 	end,
 })
+
+local Bypass = Window:Tab({
+	Title = "Bypasses",
+	Icon = "shield-user",
+	Locked = false,
+})
+
+Bypass:Section({
+	Title = "Generals",
+})
+
+Bypass:Toggle({
+	Title = "Load Bypasses",
+	Desc = "This CANNOT be disabled once toggled",
+	Value = getgenv().bypassConfig.enabled,
+	Callback = function(state)
+		getgenv().bypassConfig.enabled = state
+		if not state then
+			Modules:Unload("universal/bypass.lua")
+			return
+		end
+		Modules:Load("universal/bypass.lua")
+		Config:Save()
+	end,
+})
+
+local bypassToggles = {
+	{ key = "core", title = "CoreGUI Asset Preload" },
+	{ key = "memory", title = "Memory Monitoring" },
+	{ key = "market", title = "MarketService Buffoonery" },
+	{ key = "parent", title = "Hidden LocalScripts" },
+	{ key = "garbage", title = "Garbage Collector Monitoring" },
+	{ key = "message", title = "LogService Monitoring" },
+	{ key = "analytics", title = "AnalyticsService C2S" },
+	{ key = "property", title = "Property Change Events" },
+}
+
+for _, toggleConfig in ipairs(bypassToggles) do
+	Bypass:Toggle({
+		Title = toggleConfig.title,
+		Value = getgenv().bypassConfig[toggleConfig.key],
+		Callback = function(state)
+			if getgenv().bypassConfig[toggleConfig.key] ~= state then
+				warnUser()
+			end
+			getgenv().bypassConfig[toggleConfig.key] = state
+			Config:Save()
+		end,
+	})
+end
+
+Bypass:Section({
+	Title = "Executor Specific",
+})
+
+local executorToggles = {
+	{ key = "raw", title = "rawget" },
+	{ key = "debug", title = "debug" },
+	{ key = "proxy", title = "proxy" },
+	{ key = "memoryleak", title = "memoryleak" },
+	{ key = "environment", title = "environment" },
+}
+
+for _, toggleConfig in ipairs(executorToggles) do
+	Bypass:Toggle({
+		Title = toggleConfig.title,
+		Value = getgenv().bypassConfig[toggleConfig.key],
+		Callback = function(state)
+			if getgenv().bypassConfig[toggleConfig.key] ~= state then
+				warnUser()
+			end
+			getgenv().bypassConfig[toggleConfig.key] = state
+			Config:Save()
+		end,
+	})
+end
 
 local Visuals = Window:Tab({
 	Title = "Visuals",
@@ -453,11 +746,12 @@ Visuals:Section({
 	Title = "Players",
 })
 
-Elements.espToggle = Visuals:Toggle({
+Visuals:Toggle({
 	Title = "Player ESP",
 	Desc = "Enable/Disable the ESP functionality",
 	Value = getgenv().espConfig.enabled,
 	Callback = function(state)
+		getgenv().espConfig.enabled = state
 		if not state then
 			Modules:Unload("universal/esp.lua")
 			return
@@ -467,47 +761,26 @@ Elements.espToggle = Visuals:Toggle({
 	end,
 })
 
-Elements.nameToggle = Visuals:Toggle({
-	Title = "Show Names",
-	Desc = "Whether or not the ESP should display name boards",
-	Value = getgenv().espConfig.showNames,
-	Callback = function(state)
-		getgenv().espConfig.showNames = state
-		Config:Save()
-	end,
-})
+local espToggles = {
+	{ key = "showNames", title = "Show Names", desc = "Whether or not the ESP should display name boards" },
+	{ key = "showDistance", title = "Show Distance", desc = "Whether or not the ESP should display the player distance on the name board" },
+	{ key = "showHealth", title = "Show Health", desc = "Whether or not the ESP should display the player health on the name board" },
+	{ key = "useTeamColor", title = "Team Colors", desc = "Whether or not the ESP highlights should use the team colors" },
+}
 
-Elements.nameToggle = Visuals:Toggle({
-	Title = "Show Distance",
-	Desc = "Whether or not the ESP should display the player distance on the name board",
-	Value = getgenv().espConfig.showDistance,
-	Callback = function(state)
-		getgenv().espConfig.showDistance = state
-		Config:Save()
-	end,
-})
+for _, toggleConfig in ipairs(espToggles) do
+	Visuals:Toggle({
+		Title = toggleConfig.title,
+		Desc = toggleConfig.desc,
+		Value = getgenv().espConfig[toggleConfig.key],
+		Callback = function(state)
+			getgenv().espConfig[toggleConfig.key] = state
+			Config:Save()
+		end,
+	})
+end
 
-Elements.nameToggle = Visuals:Toggle({
-	Title = "Show Health",
-	Desc = "Whether or not the ESP should display the player health on the name board",
-	Value = getgenv().espConfig.showHealth,
-	Callback = function(state)
-		getgenv().espConfig.showHealth = state
-		Config:Save()
-	end,
-})
-
-Elements.nameToggle = Visuals:Toggle({
-	Title = "Team Colors",
-	Desc = "Whether or not the ESP highlights should use the team colors",
-	Value = getgenv().espConfig.useTeamColor,
-	Callback = function(state)
-		getgenv().espConfig.useTeamColor = state
-		Config:Save()
-	end,
-})
-
-Elements.espDrop = Visuals:Dropdown({
+Visuals:Dropdown({
 	Title = "ESP Mode",
 	Values = { "Highlight", "Xray" },
 	Value = getgenv().espConfig.mode,
@@ -517,7 +790,7 @@ Elements.espDrop = Visuals:Dropdown({
 	end,
 })
 
-Elements.fillSlider = Visuals:Slider({
+Visuals:Slider({
 	Title = "Highlight Fill Transparency",
 	Step = 0.1,
 	Value = {
@@ -525,13 +798,13 @@ Elements.fillSlider = Visuals:Slider({
 		Max = 2,
 		Default = getgenv().espConfig.fillTransparency,
 	},
-	Callback = function(value)
-		getgenv().espConfig.fillTransparency = tonumber(value)
+	Callback = function(val)
+		getgenv().espConfig.fillTransparency = tonumber(val)
 		Config:Save()
 	end,
 })
 
-Elements.outlineSlider = Visuals:Slider({
+Visuals:Slider({
 	Title = "Highlight Outline Transparency",
 	Step = 0.1,
 	Value = {
@@ -539,13 +812,13 @@ Elements.outlineSlider = Visuals:Slider({
 		Max = 2,
 		Default = getgenv().espConfig.outlineTransparency,
 	},
-	Callback = function(value)
-		getgenv().espConfig.outlineTransparency = tonumber(value)
+	Callback = function(val)
+		getgenv().espConfig.outlineTransparency = tonumber(val)
 		Config:Save()
 	end,
 })
 
-Elements.textSlider = Visuals:Slider({
+Visuals:Slider({
 	Title = "Name Board Text Size",
 	Step = 1,
 	Value = {
@@ -553,13 +826,13 @@ Elements.textSlider = Visuals:Slider({
 		Max = 30,
 		Default = getgenv().espConfig.textSize,
 	},
-	Callback = function(value)
-		getgenv().espConfig.textSize = tonumber(value)
+	Callback = function(val)
+		getgenv().espConfig.textSize = tonumber(val)
 		Config:Save()
 	end,
 })
 
-Elements.teamPick = Visuals:Colorpicker({
+Visuals:Colorpicker({
 	Title = "Teammate Highlight Color",
 	Default = getgenv().espConfig.teammateColor,
 	Callback = function(color)
@@ -568,7 +841,7 @@ Elements.teamPick = Visuals:Colorpicker({
 	end,
 })
 
-Elements.enemyPick = Visuals:Colorpicker({
+Visuals:Colorpicker({
 	Title = "Enemy Highlight Color",
 	Default = getgenv().espConfig.enemyColor,
 	Callback = function(color)
@@ -582,7 +855,7 @@ Visuals:Section({
 })
 
 refreshAnimations()
-Elements.emoteDrop = Visuals:Dropdown({
+Visuals:Dropdown({
 	Title = "Select Emote",
 	Values = emotes,
 	Callback = function(option)
@@ -592,7 +865,7 @@ Elements.emoteDrop = Visuals:Dropdown({
 	end,
 })
 
-local emoteInput = Visuals:Input({
+Visuals:Input({
 	Title = "Add Emote",
 	Desc = "Adds an emote from outside the game",
 	Type = "Input",
@@ -600,11 +873,11 @@ local emoteInput = Visuals:Input({
 	Callback = function(input)
 		table.insert(asset, input)
 		refreshAnimations()
-		Elements.emoteDrop:Refresh(emotes)
+		Config:Save()
 	end,
 })
 
-Elements.emoteBind = Visuals:Keybind({
+Visuals:Keybind({
 	Title = "Keybind Emote",
 	Desc = "Keybind to play the selected emote",
 	Value = "X",
@@ -624,7 +897,7 @@ Settings:Section({
 	Title = "Configuration",
 })
 
-Elements.windowBind = Settings:Keybind({
+Settings:Keybind({
 	Title = "Window toggle",
 	Desc = "Keybind to toggle ui",
 	Value = "X",
@@ -640,17 +913,16 @@ for theme in pairs(Windui:GetThemes()) do
 end
 table.sort(themes)
 
-Elements.themeDrop = Settings:Dropdown({
+Settings:Dropdown({
 	Title = "Theme",
 	Values = themes,
-	Value = "Dark",
 	Callback = function(option)
 		Windui:SetTheme(option)
 		Config:Save()
 	end,
 })
 
-local loadToggle = Settings:Toggle({
+Settings:Toggle({
 	Title = "Auto Load Config",
 	Desc = "Load settings automatically on startup",
 	Value = isfile(loadFlag),
@@ -660,10 +932,11 @@ local loadToggle = Settings:Toggle({
 		else
 			delfile(loadFlag)
 		end
+		Config:Save()
 	end,
 })
 
-local saveToggle = Settings:Toggle({
+Settings:Toggle({
 	Title = "Auto Save Config",
 	Desc = "Save settings automatically when changed",
 	Value = isfile(saveFlag),
@@ -673,6 +946,7 @@ local saveToggle = Settings:Toggle({
 		else
 			delfile(saveFlag)
 		end
+		Config:Save()
 	end,
 })
 
@@ -680,17 +954,29 @@ Settings:Section({
 	Title = "Credits",
 })
 
-local gooseCredit = Settings:Paragraph({
+Settings:Paragraph({
 	Title = "Goose",
 	Desc = "The script developer, if you encounter any issues please report them at https://github.com/goose-birb/lua-buffoonery/issues",
+	Buttons = {
+	       {
+            Icon = "messages-square",
+            Title = "Discord Server",
+            Callback = function() setclipboard("https://discord.gg/r3btjAHPVh") end,
+        },
+        {
+            Icon = "github",
+            Title = "Issue Tracker",
+            Callback = function() setclipboard("https://github.com/goose-birb/lua-buffoonery/issues") end,
+        }
+    }
 })
 
-local iyCredit = Settings:Paragraph({
+Settings:Paragraph({
 	Title = "The Infinite Yield Team",
 	Desc = "The ESP functionality is basically just an Infinite Yield wrapper with extra steps.",
 })
 
-local footagesusCredit = Settings:Paragraph({
+Settings:Paragraph({
 	Title = "Footagesus",
 	Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox.",
 })
@@ -700,21 +986,39 @@ if player.Character then
 	handleTracks()
 end
 
+RunService.Heartbeat:Connect(function()
+	updateTriggerAction()
+end)
+
 default:Set("asset", asset)
 default:Set("themes", themes)
-for _, element in pairs(Elements) do
-	default:Register(element.Title, element)
-end
-
 Window:SelectTab(1)
-if isfile(loadFlag) then
-	local data = default:Load()
-	asset = data.asset
-	themes = data.themes
 
-	for _, element in pairs(Elements) do
-		if element.__type == "Dropdown" then
-			element.Callback(element.Value)
-		end
+do
+	local version = Window.Folder .. "/" .. "version"
+	local current = isfile(version) and readfile(version)
+	local latest = game:HttpGet(Repository .. "version")
+	if current and current ~= latest then
+		Windui:Popup({
+			Title = "Version Manager",
+			Icon = "download",
+			Content = "A new Wildcard version is available, do you wish to install it?",
+			Buttons = {
+				{
+					Title = "Remind me later",
+					Callback = function() end,
+					Variant = "Tertiary",
+				},
+				{
+					Title = "Yes",
+					Callback = function()
+						writefile(version, latest)
+					end,
+					Variant = "Primary",
+				},
+			},
+		})
+	elseif not current then
+	  writefile(version, latest)
 	end
 end
