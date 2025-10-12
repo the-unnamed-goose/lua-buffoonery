@@ -361,7 +361,7 @@ end
 
 local function main(deltaTime)
 	local config = getgenv().aimConfig
-	if not config then
+	if not config or not config.enabled then
 		return
 	end
 

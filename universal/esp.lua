@@ -26,7 +26,7 @@ local function getColor(plr)
 end
 
 local function getDisplayText(plr, char)
-  local character = player.Character or workspace:FindFirstChild(player.Name)
+	local character = player.Character or workspace:FindFirstChild(player.Name)
 	local text = plr.Name
 
 	if getgenv().espConfig.showHealth and char then
@@ -74,7 +74,6 @@ local function applyESP(plr)
 	end
 
 	local color = getColor(plr)
-
 	local high = Instance.new("Highlight")
 	high.FillColor = color
 	high.OutlineColor = color
@@ -120,18 +119,6 @@ local function removeESP(plr)
 	end
 end
 
-for _, plr in pairs(Players:GetPlayers()) do
-	if plr ~= player then
-		plr.CharacterAdded:Connect(function()
-			applyESP(plr)
-		end)
-
-		if plr.Character or workspace:FindFirstChild(plr.Name) then
-			applyESP(plr)
-		end
-	end
-end
-
 local Module = {}
 function Module.Load()
 	if Module.Connections then
@@ -149,17 +136,22 @@ function Module.Load()
 	)
 	table.insert(Module.Connections, Players.PlayerRemoving:Connect(removeESP))
 
-	table.insert(
-		Module.Connections,
-		player.CharacterAdded:Connect(function()
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr ~= player then
-					removeESP(plr)
-					applyESP(plr)
-				end
-			end
-		end)
-	)
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr == player then
+			continue
+		end
+
+		table.insert(
+			Module.Connections,
+			plr.CharacterAdded:Connect(function()
+				applyESP(plr)
+			end)
+		)
+
+		if plr.Character or workspace:FindFirstChild(plr.Name) then
+			applyESP(plr)
+		end
+	end
 end
 
 function Module.Unload()
@@ -172,6 +164,13 @@ function Module.Unload()
 			connection:Disconnect()
 		end
 	end
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player then
+			removeESP(plr)
+		end
+	end
+	Module.Connections = nil
 end
 
 return Module

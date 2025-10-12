@@ -59,13 +59,23 @@ function Module:Load()
 	end
 	Module.Enabled = true
 
-	-- Hidden modules go brrr
+	-- Isn't really compatible with the Krnl UI
 	task.spawn(function()
 		if not getgenv().bypassConfig.parent then
 			return
 		end
+
+		local hidden = gethui()
 		for index, element in getgc(true) do
-			if element and type(element) == "userdata" and not element.Parent or element.Parent.Name == "" then
+			local data = typeof(element)
+			if data == "Instance" then
+				if
+					element.IsDescendantOf and element:IsDescendantOf(hidden)
+					or (not element.Parent or element.Name ~= "")
+				then
+					continue
+				end
+
 				hookmetamethod(element, "__namecall", newcclosure(stopExecution))
 				hookmetamethod(element, "__index", newcclosure(stopExecution))
 				hookmetamethod(element, "__newindex", newcclosure(stopExecution))

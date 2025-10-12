@@ -6,11 +6,8 @@ local Assets = Folder .. "assets/"
 local Repository = "http://localhost:8000/"
 
 local Modules = {}
-function Modules.Load(self, file, url)
-	if Modules[file] then
-		return Modules[file]
-	end
-
+Modules.State = {}
+function Modules.Fetch(file, url)
 	local cache = Assets .. file
 	local content = isfile(cache) and readfile(cache)
 	if not content or content == "" then
@@ -18,29 +15,40 @@ function Modules.Load(self, file, url)
 		writefile(cache, content)
 	end
 
-	Modules[file] = loadstring(content)()
+	return content
+end
+
+function Modules.Load(file, url)
+	if not Modules[file] then
+		Modules[file] = loadstring(Modules.Fetch(file, url))()
+	end
+
 	local success = pcall(function()
-	  Modules[file]:Load()
+		Modules[file].Load()
 	end)
 	if not success then
 		warn("Failed to load module: " .. file)
 	end
-	
+
+	Modules.State[file] = true
 	return Modules[file]
 end
 
-function Modules.Unload(self, moduleName)
-	if not Modules[moduleName] then
+function Modules.Unload(file)
+	if not Modules[file] or not Modules[file].Unload then
 		return
 	end
 
-	if Modules[moduleName].Unload then
-		pcall(Modules[moduleName]:Unload())
+	local success = pcall(function()
+		Modules[file].Unload()
+	end)
+	if not success then
+		warn("Failed to unload module: " .. file)
 	end
-	Modules[moduleName] = nil
+	Modules.State[file] = false
 end
 
-local Wind = Modules:Load("wind.lua", "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+local Wind = Modules.Load("wind.lua", "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
 local Players = game:GetService("Players")
 local Input = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -63,7 +71,7 @@ getgenv().aimConfig = {
 	jitterScale = 0.5,
 	maxJitterOffset = 3.0,
 	useRay = true,
-	respectTeams = false,
+	rspectTeams = false,
 	lockCamera = true,
 	triggerBot = true,
 	triggerMode = "button",
@@ -123,7 +131,7 @@ function Config.Save()
 	end
 end
 
-local Utils = Modules:Load("universal/utils.lua")
+local Utils = Modules.Load("universal/utils.lua")
 local default = Config:CreateConfig("default")
 local saveFlag = Folder .. "/flags/autosave"
 local loadFlag = Folder .. "/flags/autoload"
@@ -137,63 +145,63 @@ local function warnUser()
 	})
 end
 
-local function moduleToggle(tab, title, configSection, modulePath)
+local function moduleToggle(tab, title, section, module)
 	tab:Toggle({
-	  Flag = configSection,
+		Flag = section,
 		Title = title,
-		Value = getgenv()[configSection].enabled,
+		Value = getgenv()[section].enabled,
 		Callback = function(state)
-			getgenv()[configSection].enabled = state
+			getgenv()[section].enabled = state
 			if not state then
-				Modules:Unload(modulePath)
+				Modules.Unload(module)
 			else
-				Modules:Load(modulePath)
+				Modules.Load(module)
 			end
 			Config:Save()
 		end,
 	})
 end
 
-local function configToggle(tab, title, desc, configSection, configKey)
+local function configToggle(tab, title, desc, section, key)
 	tab:Toggle({
-	  Flag = configKey,
+		Flag = key,
 		Title = title,
 		Desc = desc,
-		Value = getgenv()[configSection][configKey],
+		Value = getgenv()[section][key],
 		Callback = function(state)
-			getgenv()[configSection][configKey] = state
+			getgenv()[section][key] = state
 			Config:Save()
 		end,
 	})
 end
 
-local function configSlider(tab, title, desc, configSection, configKey, min, max, step, defaultVal)
+local function configSlider(tab, title, desc, section, key, min, max, step, default)
 	tab:Slider({
-	  Flag = configKey,
+		Flag = key,
 		Title = title,
 		Desc = desc,
 		Step = step,
 		Value = {
 			Min = min,
 			Max = max,
-			Default = getgenv()[configSection][configKey] or defaultVal,
+			Default = getgenv()[section][key] or default,
 		},
 		Callback = function(val)
-			getgenv()[configSection][configKey] = tonumber(val)
+			getgenv()[section][key] = tonumber(val)
 			Config:Save()
 		end,
 	})
 end
 
-local function configDrop(tab, title, desc, configSection, configKey, values)
+local function configDrop(tab, title, desc, section, key, values)
 	tab:Dropdown({
-	  Flag = configKey,
+		Flag = key,
 		Title = title,
 		Desc = desc,
 		Values = values,
-		Value = getgenv()[configSection][configKey],
+		Value = getgenv()[section][key],
 		Callback = function(selected)
-			getgenv()[configSection][configKey] = selected
+			getgenv()[section][key] = selected
 			Config:Save()
 		end,
 	})
@@ -332,7 +340,19 @@ do
 	})
 
 	Bypass:Section({ Title = "General" })
-	moduleToggle(Bypass, "Load Bypasses", "bypassConfig", "universal/bypass.lua")
+	Bypass:Toggle({
+		Flag = "bypassConfig",
+		Title = "Load Bypasses",
+		Value = getgenv().bypassConfig.enabled,
+		Callback = function(state)
+			getgenv().bypassConfig.enabled = state
+			if state then
+			  Bypass:LockAll()
+				Modules.Load("universal/bypass.lua")
+			end
+			Config:Save()
+		end,
+	})
 
 	local bypassToggles = {
 		{ key = "core", title = "CoreGUI Asset Preload" },
@@ -503,24 +523,24 @@ do
 			Config:Save()
 		end,
 	})
-	
-	Settings:Input({
-    Title = "Profile Name",
-    Desc = "Creates a new profile, if needed",
-    Type = "Input",
-    Placeholder = "default",
-    Callback = function(input) 
-      default = Config:CreateConfig(input)
-    end
-  })
 
-  local profiles = {}
+	Settings:Input({
+		Title = "Profile Name",
+		Desc = "Creates a new profile, if needed",
+		Type = "Input",
+		Placeholder = "default",
+		Callback = function(input)
+			default = Config:CreateConfig(input)
+		end,
+	})
+
+	local profiles = {}
 	for _, profile in listfiles(Assets) do
 		table.insert(profiles, string.split(profile, ".")[1])
 	end
 	table.sort(profiles)
 
-  Settings:Dropdown({
+	Settings:Dropdown({
 		Title = "Select Profile",
 		Values = profiles,
 		Callback = function(option)

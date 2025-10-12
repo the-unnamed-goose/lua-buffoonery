@@ -2,7 +2,7 @@
 local Players = game:GetService("Players")
 local Windui = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local Replicated = game:GetService("ReplicatedStorage")
-local Repository = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+local Repository = "https://raw.githubusercontent.com/the-unnamed-goose/lua-buffoonery/master/"
 
 getgenv().aimConfig = {
 	MAX_DISTANCE = 250,
