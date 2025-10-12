@@ -1,1 +1,8 @@
-This is just a collection of random lua scripts I made, hope you find them useful.
+Lua Buffoonery
+===============
+
+> [!TIP]
+> We now have a Discord server!
+> &ensp; [![](https://dcbadge.limes.pink/api/server/https://discord.gg/r3btjAHPVh)](https://dsc.gg/lua-buffoonery)
+
+Just my small collection of Lua scripts.

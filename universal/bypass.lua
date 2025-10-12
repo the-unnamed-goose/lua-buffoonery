@@ -52,31 +52,82 @@ local function stopExecution()
 	end
 end
 
-local function waitForLoad()
-	if not game:IsLoaded() then
-		game.Loaded:Wait()
+local Module = {}
+function Module:Load()
+	if Module.Enabled then
+		return
 	end
-end
+	Module.Enabled = true
 
--- Hidden modules go brrr
-if getgenv().bypassConfig.parent then
+	-- Hidden modules go brrr
 	task.spawn(function()
+		if not getgenv().bypassConfig.parent then
+			return
+		end
 		for index, element in getgc(true) do
-			if element then
-				if element and not element.Parent or element.Name == "" and element.IsDescendantOf and element.IsDescendantOf(gethui()) then
-					hookmetamethod(element, "__namecall", newcclosure(stopExecution))
-					hookmetamethod(element, "__index", newcclosure(stopExecution))
-					hookmetamethod(element, "__newindex", newcclosure(stopExecution))
-				end
+			if element and type(element) == "userdata" and not element.Parent or element.Parent.Name == "" then
+				hookmetamethod(element, "__namecall", newcclosure(stopExecution))
+				hookmetamethod(element, "__index", newcclosure(stopExecution))
+				hookmetamethod(element, "__newindex", newcclosure(stopExecution))
 			end
 		end
 	end)
-end
 
--- Bypass anticheats that look for stable memory patterns aka simulate a memory leak
-if getgenv().bypassConfig.memoryleak then
+	-- Memory usage spoofing
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.memory then
+			return
+		end
+
+		local baseline = Stats:GetTotalMemoryUsageMb()
+		local baselineGui = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Gui)
+
+		local memoryDrift = 0
+		local lastCheck = tick()
+
+		Run.Heartbeat:Connect(function()
+			local currentTime = tick()
+			local timeDiff = currentTime - lastCheck
+
+			if timeDiff > 0.5 then
+				memoryDrift = memoryDrift + (Random.new():NextNumber(-0.5, 0.5))
+				memoryDrift = clamp(memoryDrift, -5, 5)
+
+				totalMemory = baseline + memoryDrift
+				guiMemory = baselineGui + (memoryDrift * 0.3)
+				lastCheck = currentTime
+			end
+		end)
+	end)
+
+	task.spawn(function()
+		local statsBypass
+		statsBypass = hookmetamethod(
+			game,
+			"__namecall",
+			newcclosure(function(self, ...)
+				if not checkcaller() and typeof(self) == "Instance" and self.ClassName == "Stats" then
+					local method = getnamecallmethod()
+					local args = { ... }
+
+					if method == "GetTotalMemoryUsageMb" or method == "getTotalMemoryUsageMb" then
+						return totalMemory + Random.new():NextNumber(-0.1, 0.1)
+					elseif method == "GetMemoryUsageMbForTag" or method == "getMemoryUsageMbForTag" then
+						if #args > 0 and args[1] == Enum.DeveloperMemoryTag.Gui then
+							return guiMemory + Random.new():NextNumber(-0.05, 0.05)
+						end
+					end
+				end
+				return statsBypass(self, ...)
+			end)
+		)
+	end)
+
+	-- Bypass anticheats that look for stable memory patterns aka simulate a memory leak
+	task.spawn(function()
+		if not getgenv().bypassConfig.memoryleak or getgenv().bypassConfig.memory then
+			return
+		end
 
 		local baseline = Stats:GetTotalMemoryUsageMb()
 		local baselineGui = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Gui)
@@ -112,7 +163,9 @@ if getgenv().bypassConfig.memoryleak then
 	end)
 
 	task.spawn(function()
-		pcall(waitForLoad)
+		if getgenv().bypassConfig.memory then
+			return
+		end
 
 		local statsBypass
 		statsBypass = hookmetamethod(
@@ -135,64 +188,12 @@ if getgenv().bypassConfig.memoryleak then
 			end)
 		)
 	end)
-end
 
--- Memory usage spoofing
-if getgenv().bypassConfig.memory then
+	-- Garbage collector spoofing
 	task.spawn(function()
-		pcall(waitForLoad)
-
-		local baseline = Stats:GetTotalMemoryUsageMb()
-		local baselineGui = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Gui)
-
-		local memoryDrift = 0
-		local lastCheck = tick()
-
-		Run.Heartbeat:Connect(function()
-			local currentTime = tick()
-			local timeDiff = currentTime - lastCheck
-
-			if timeDiff > 0.5 then
-				memoryDrift = memoryDrift + (Random.new():NextNumber(-0.5, 0.5))
-				memoryDrift = clamp(memoryDrift, -5, 5)
-
-				totalMemory = baseline + memoryDrift
-				guiMemory = baselineGui + (memoryDrift * 0.3)
-				lastCheck = currentTime
-			end
-		end)
-	end)
-
-	task.spawn(function()
-		pcall(waitForLoad)
-
-		local statsBypass
-		statsBypass = hookmetamethod(
-			game,
-			"__namecall",
-			newcclosure(function(self, ...)
-				if not checkcaller() and typeof(self) == "Instance" and self.ClassName == "Stats" then
-					local method = getnamecallmethod()
-					local args = { ... }
-
-					if method == "GetTotalMemoryUsageMb" or method == "getTotalMemoryUsageMb" then
-						return totalMemory + Random.new():NextNumber(-0.1, 0.1)
-					elseif method == "GetMemoryUsageMbForTag" or method == "getMemoryUsageMbForTag" then
-						if #args > 0 and args[1] == Enum.DeveloperMemoryTag.Gui then
-							return guiMemory + Random.new():NextNumber(-0.05, 0.05)
-						end
-					end
-				end
-				return statsBypass(self, ...)
-			end)
-		)
-	end)
-end
-
--- Garbage collector spoofing
-if getgenv().bypassConfig.garbage then
-	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.garbage then
+			return
+		end
 
 		local baselineGc = gcinfo()
 		local gcDrift = 0
@@ -210,7 +211,6 @@ if getgenv().bypassConfig.garbage then
 		local function getGcValue()
 			return baselineGc + gcDrift + Random.new():NextNumber(-0.5, 0.5)
 		end
-
 		hookfunction(gcinfo, newcclosure(getGcValue))
 
 		local garbageBypass
@@ -224,12 +224,12 @@ if getgenv().bypassConfig.garbage then
 			end)
 		)
 	end)
-end
 
--- Bypass instance creation/deletion checks
-if getgenv().bypassConfig.property then
+	-- Bypass instance creation/deletion checks
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.property then
+			return
+		end
 
 		local propertyBypass
 		propertyBypass = hookmetamethod(
@@ -249,12 +249,12 @@ if getgenv().bypassConfig.property then
 			end)
 		)
 	end)
-end
 
--- Don't do stupid sh
-if getgenv().bypassConfig.market then
+	-- Don't do stupid sh
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.market then
+			return
+		end
 
 		local marketBypass
 		marketBypass = hookmetamethod(
@@ -271,12 +271,12 @@ if getgenv().bypassConfig.market then
 			end)
 		)
 	end)
-end
 
--- Bypass some client -> server communication
-if getgenv().bypassConfig.analytics then
+	-- Bypass some client -> server communication
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.analytics then
+			return
+		end
 
 		local analyticsBypass -- What did you think I would name this?
 		analyticsBypass = hookmetamethod(
@@ -292,31 +292,31 @@ if getgenv().bypassConfig.analytics then
 			end)
 		)
 	end)
-end
 
--- Yes
-if getgenv().bypassConfig.debug then
+	-- Yes
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.debug then
+			return
+		end
 
 		local debugBypass = debug.info
 		hookfunction(
 			debug.info,
 			newcclosure(function(func, ...)
 				if func and type(func) == "function" and not checkcaller() and getthreadidentity() < 3 then
-					local dummy = function() end
+					local dummy = newcclosure(function() end)
 					return debugBypass(dummy, ...)
 				end
 				return debugBypass(func, ...)
 			end)
 		)
 	end)
-end
 
--- Bypass core gui asset loading callbacks
-if getgenv().bypassConfig.core then
+	-- Bypass core gui asset loading callbacks
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.core then
+			return
+		end
 
 		local preloadBypass
 		hookfunction(
@@ -327,12 +327,12 @@ if getgenv().bypassConfig.core then
 			end)
 		)
 	end)
-end
 
--- No you don't proxy anything
-if getgenv().bypassConfig.proxy then
+	-- No you don't proxy anything
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.proxy then
+			return
+		end
 
 		local proxyBypass
 		proxyBypass = hookfunction(
@@ -343,12 +343,12 @@ if getgenv().bypassConfig.proxy then
 			end)
 		)
 	end)
-end
 
--- Don't allow rawget
-if getgenv().bypassConfig.raw then
+	-- Don't allow rawget
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.raw then
+			return
+		end
 
 		local rawBypass
 		rawBypass = hookfunction(
@@ -359,12 +359,12 @@ if getgenv().bypassConfig.raw then
 			end)
 		)
 	end)
-end
 
--- Just fk whoever uses the logs service for detection, also fixes some weird hook detection methods
-if getgenv().bypassConfig.message then
+	-- Just fk whoever uses the logs service for detection, also fixes some weird hook detection methods
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.message then
+			return
+		end
 
 		local logBypass
 		logBypass = hookmetamethod(
@@ -421,12 +421,12 @@ if getgenv().bypassConfig.message then
 			end)
 		)
 	end)
-end
 
--- Fix some bad sUNC implementation
-if getgenv().bypassConfig.environment then
+	-- Fix some bad sUNC implementation
 	task.spawn(function()
-		pcall(waitForLoad)
+		if not getgenv().bypassConfig.environment then
+			return
+		end
 
 		local createBypass
 		createBypass = hookfunction(
@@ -466,48 +466,50 @@ if getgenv().bypassConfig.environment then
 			end)
 		)
 	end)
+
+	-- Gracefully handle threads that don't take "No" for an answer
+	task.spawn(function()
+		local coroutineBypass
+		coroutineBypass = coroutine.status
+		hookfunction(
+			coroutine.status,
+			newcclosure(function(thread)
+				if thread and not checkcaller() and getthreadidentity() < 3 then
+					for _, blockedThread in ipairs(blockedThreads) do
+						if thread == blockedThread then
+							return "running"
+						end
+					end
+				end
+				return coroutineBypass(thread)
+			end)
+		)
+	end)
+
+	task.spawn(function()
+		local coroutineBypass
+		coroutineBypass = coroutine.resume
+		hookfunction(
+			coroutine.resume,
+			newcclosure(function(thread, ...)
+				if thread and not checkcaller() and getthreadidentity() < 3 then
+					for _, blockedThread in ipairs(blockedThreads) do
+						if thread == blockedThread then
+							coroutine.yield()
+							return false
+						end
+					end
+				end
+				return coroutineBypass(thread, ...)
+			end)
+		)
+	end)
 end
 
--- Gracefully handle threads that don't take "No" for an answer
-task.spawn(function()
-	pcall(waitForLoad)
-
-	local coroutineBypass
-	coroutineBypass = coroutine.status
-	hookfunction(
-		coroutine.status,
-		newcclosure(function(thread)
-			if thread and not checkcaller() and getthreadidentity() < 3 then
-				for _, blockedThread in ipairs(blockedThreads) do
-					if thread == blockedThread then
-						return "running"
-					end
-				end
-			end
-			return coroutineBypass(thread)
-		end)
+function Module:Unload()
+	warning(
+		"The bypass module is not dynamic. Its configuration cannot be changed at runtime and it cannot be disabled."
 	)
-end)
+end
 
-task.spawn(function()
-	pcall(waitForLoad)
-
-	local coroutineBypass
-	coroutineBypass = coroutine.resume
-	hookfunction(
-		coroutine.resume,
-		newcclosure(function(thread, ...)
-			if thread and not checkcaller() and getthreadidentity() < 3 then
-				for _, blockedThread in ipairs(blockedThreads) do
-					if thread == blockedThread then
-						coroutine.yield()
-						return false
-					end
-				end
-			end
-			return coroutineBypass(thread, ...)
-		end)
-	)
-end)
-
-return {}
+return Module

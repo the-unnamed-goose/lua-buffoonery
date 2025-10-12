@@ -1,10 +1,8 @@
 -- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 
 getgenv().espConfig = getgenv().espConfig
 	or {
-		mode = "Highlight",
 		showNames = true,
 		showDistance = false,
 		showHealth = false,
@@ -28,6 +26,7 @@ local function getColor(plr)
 end
 
 local function getDisplayText(plr, char)
+	local character = player.Character or workspace:FindFirstChild(player.Name)
 	local text = plr.Name
 
 	if getgenv().espConfig.showHealth and char then
@@ -37,9 +36,9 @@ local function getDisplayText(plr, char)
 		end
 	end
 
-	if getgenv().espConfig.showDistance and char and player.Character then
+	if getgenv().espConfig.showDistance and char and character then
 		local root1 = char:FindFirstChild("HumanoidRootPart")
-		local root2 = player.Character:FindFirstChild("HumanoidRootPart")
+		local root2 = character:FindFirstChild("HumanoidRootPart")
 		if root1 and root2 then
 			local distance = math.floor((root1.Position - root2.Position).Magnitude)
 			text = text .. "\n" .. distance .. " studs"
@@ -54,7 +53,7 @@ local function applyESP(plr)
 		return
 	end
 
-	local char = plr.Character
+	local char = plr.Character or workspace:FindFirstChild(plr.Name)
 	if not char then
 		return
 	end
@@ -75,25 +74,22 @@ local function applyESP(plr)
 	end
 
 	local color = getColor(plr)
-	local mode = getgenv().espConfig.mode
 
-	if mode == "Highlight" then
-		local h = Instance.new("Highlight")
-		h.FillColor = color
-		h.OutlineColor = color
-		h.FillTransparency = getgenv().espConfig.fillTransparency
-		h.OutlineTransparency = getgenv().espConfig.outlineTransparency
-		h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		h.Parent = char
-		highlights[plr] = h
-	end
+	local high = Instance.new("Highlight")
+	high.FillColor = color
+	high.OutlineColor = color
+	high.FillTransparency = getgenv().espConfig.fillTransparency
+	high.OutlineTransparency = getgenv().espConfig.outlineTransparency
+	high.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	high.Parent = char
+	highlights[plr] = high
 
 	if getgenv().espConfig.showNames then
-		local bb = Instance.new("BillboardGui")
-		bb.Adornee = head
-		bb.Size = UDim2.new(0, 200, 0, 50)
-		bb.AlwaysOnTop = true
-		bb.StudsOffset = Vector3.new(0, 2.5, 0)
+		local bill = Instance.new("BillboardGui")
+		bill.Adornee = head
+		bill.Size = UDim2.new(0, 200, 0, 50)
+		bill.AlwaysOnTop = true
+		bill.StudsOffset = Vector3.new(0, 2.5, 0)
 
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
@@ -106,9 +102,9 @@ local function applyESP(plr)
 		label.Font = Enum.Font.SourceSansBold
 		label.TextYAlignment = Enum.TextYAlignment.Top
 
-		label.Parent = bb
-		bb.Parent = head
-		billboards[plr] = bb
+		label.Parent = bill
+		bill.Parent = head
+		billboards[plr] = bill
 	end
 end
 
@@ -130,24 +126,52 @@ for _, plr in pairs(Players:GetPlayers()) do
 			applyESP(plr)
 		end)
 
-		if plr.Character then
+		if plr.Character or workspace:FindFirstChild(plr.Name) then
 			applyESP(plr)
 		end
 	end
 end
 
-Players.PlayerAdded:Connect(function(plr)
-	plr.CharacterAdded:Connect(function()
-		applyESP(plr)
-	end)
-end)
-Players.PlayerRemoving:Connect(removeESP)
+local Module = {}
+function Module:Load()
+	if Module.Connections then
+		return
+	end
 
-player.CharacterAdded:Connect(function()
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player then
-			removeESP(plr)
-			applyESP(plr)
+	Module.Connections = {}
+	table.insert(
+		Module.Connections,
+		Players.PlayerAdded:Connect(function(plr)
+			plr.CharacterAdded:Connect(function()
+				applyESP(plr)
+			end)
+		end)
+	)
+	table.insert(Module.Connections, Players.PlayerRemoving:Connect(removeESP))
+
+	table.insert(
+		Module.Connections,
+		player.CharacterAdded:Connect(function()
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr ~= player then
+					removeESP(plr)
+					applyESP(plr)
+				end
+			end
+		end)
+	)
+end
+
+function Module:Unload()
+	if not Module.Connections then
+		return
+	end
+
+	for _, connection in ipairs(Module.Connections) do
+		if connection and connection.Disconnect then
+			connection:Disconnect()
 		end
 	end
-end)
+end
+
+return Module

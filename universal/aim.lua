@@ -1,15 +1,18 @@
 -- This file is licensed under the Perl Artistic License. See https://dev.perl.org/licenses/artistic.html for more details.
+local Input = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInput = game:GetService("UserInputService")
+local Run = game:GetService("RunService")
 
 local camera = workspace.CurrentCamera
 local player = Players.LocalPlayer
 
 getgenv().aimConfig = getgenv().aimConfig
 	or {
+		enabled = true,
 		targetPart = "Head",
 		aimMode = "camera",
+		runPriority = 10,
+		useHook = true,
 
 		fovDeg = 25,
 		triggerFovDeg = 2,
@@ -43,11 +46,15 @@ local perlinSeed = math.random(1, 10000)
 local cameraHook
 
 task.spawn(function()
+	if not getgenv().aimConfig.useHook then
+		return
+	end
+
 	cameraHook = hookmetamethod(
 		camera,
 		"__newindex",
 		newcclosure(function(self, key, value, ...)
-			if not checkcaller() and getthreadidentity() < 3 and key == "CFrame" then
+			if getgenv().aimConfig.enabled and not checkcaller() and getthreadidentity() < 3 and key == "CFrame" then
 				if currentTarget and getgenv().aimConfig.lockCamera then
 					local rotation = camera.CFrame - camera.CFrame.Position
 					return cameraHook(self, key, rotation + value.Position, ...)
@@ -56,6 +63,7 @@ task.spawn(function()
 			return cameraHook(self, key, value, ...)
 		end)
 	)
+	getgenv().aimConfig.useHook = true
 end)
 
 local function perlinNoise(x, y, seed)
@@ -92,7 +100,7 @@ local function perlinNoise(x, y, seed)
 	)
 end
 
-local function getJitterOffset(deltaTime, distance)
+local function getJitter(deltaTime, distance)
 	local config = getgenv().aimConfig
 	if not config.jitterEnabled or config.jitterIntensity <= 0 then
 		return Vector3.zero
@@ -328,7 +336,7 @@ local function aimAt(targetPos, deltaTime, isNewTarget)
 
 		local desiredLook = (targetPos - camPos).Unit
 		local distance = (targetPos - camPos).Magnitude
-		local jitter = getJitterOffset(deltaTime, distance)
+		local jitter = getJitter(deltaTime, distance)
 		local jitteredLook = applyJitter(desiredLook, jitter)
 
 		if isNewTarget then
@@ -383,4 +391,28 @@ local function main(deltaTime)
 	end
 end
 
-return RunService:BindToRenderStep("Camera", math.huge, main)
+local Module = {}
+function Module:Load()
+	if Module.Connection then
+		return
+	end
+	Module.Connection = Run:BindToRenderStep("Camera", 1e+10 * getgenv().aimConfig.runPriority, main)
+end
+
+function Module:Unload()
+	if not Module.Connection then
+		return
+	end
+
+	Module.Connection:Disconnect()
+end
+
+function Module:Drop()
+	if cameraHook then
+		local metatable = table.clone(getrawmetatable(camera))
+		metatable.__newindex = cameraHook
+		setrawmetatable(camera, metatable)
+	end
+end
+
+return Module:Load()
