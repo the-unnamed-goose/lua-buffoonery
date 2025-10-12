@@ -392,14 +392,14 @@ local function main(deltaTime)
 end
 
 local Module = {}
-function Module:Load()
+function Module.Load()
 	if Module.Connection then
 		return
 	end
 	Module.Connection = Run:BindToRenderStep("Camera", 1e+10 * getgenv().aimConfig.runPriority, main)
 end
 
-function Module:Unload()
+function Module.Unload()
 	if not Module.Connection then
 		return
 	end
@@ -407,7 +407,7 @@ function Module:Unload()
 	Module.Connection:Disconnect()
 end
 
-function Module:Drop()
+function Module.Drop()
 	if cameraHook then
 		local metatable = table.clone(getrawmetatable(camera))
 		metatable.__newindex = cameraHook

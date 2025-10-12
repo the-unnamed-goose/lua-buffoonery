@@ -26,7 +26,7 @@ local function getColor(plr)
 end
 
 local function getDisplayText(plr, char)
-	local character = player.Character or workspace:FindFirstChild(player.Name)
+  local character = player.Character or workspace:FindFirstChild(player.Name)
 	local text = plr.Name
 
 	if getgenv().espConfig.showHealth and char then
@@ -133,7 +133,7 @@ for _, plr in pairs(Players:GetPlayers()) do
 end
 
 local Module = {}
-function Module:Load()
+function Module.Load()
 	if Module.Connections then
 		return
 	end
@@ -162,7 +162,7 @@ function Module:Load()
 	)
 end
 
-function Module:Unload()
+function Module.Unload()
 	if not Module.Connections then
 		return
 	end

@@ -1,16 +1,49 @@
 -- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
-local string = isfile("Wildcard/windui.lua") and readfile("Wildcard/windui.lua")
-if not string then
-	string = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
-	writefile("Wildcard/windui.lua", string)
-end
-local Windui = loadstring(string)()
+local Project = "Wildcard"
+local Folder = "WindUI/" .. Project .. "/"
+local Assets = Folder .. "assets/"
+--local Repository = "https://raw.githubusercontent.com/the-unnamed-goose/lua-buffoonery/master/"
+local Repository = "http://localhost:8000/"
 
+local Modules = {}
+function Modules.Load(self, file, url)
+	if Modules[file] then
+		return Modules[file]
+	end
+
+	local cache = Assets .. file
+	local content = isfile(cache) and readfile(cache)
+	if not content or content == "" then
+		content = url and game:HttpGet(url) or game:HttpGet(Repository .. file)
+		writefile(cache, content)
+	end
+
+	Modules[file] = loadstring(content)()
+	local success = pcall(function()
+	  Modules[file]:Load()
+	end)
+	if not success then
+		warn("Failed to load module: " .. file)
+	end
+	
+	return Modules[file]
+end
+
+function Modules.Unload(self, moduleName)
+	if not Modules[moduleName] then
+		return
+	end
+
+	if Modules[moduleName].Unload then
+		pcall(Modules[moduleName]:Unload())
+	end
+	Modules[moduleName] = nil
+end
+
+local Wind = Modules:Load("wind.lua", "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
 local Players = game:GetService("Players")
 local Input = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
---local Repository = "https://raw.githubusercontent.com/the-unnamed-goose/lua-buffoonery/master/"
-local Repository = "http://localhost:8000/"
 
 getgenv().aimConfig = {
 	enabled = false,
@@ -72,11 +105,11 @@ getgenv().silentConfig = getgenv().silentConfig or {
 	enabled = false,
 }
 
-local Window = Windui:CreateWindow({
+local Window = Wind:CreateWindow({
 	Title = "Wildcard",
 	Icon = "asterisk",
 	Author = "by Le Honk",
-	Folder = "Wildcard",
+	Folder = Project,
 	Theme = "Dark",
 	Size = UDim2.fromOffset(580, 100),
 	Resizable = true,
@@ -84,55 +117,19 @@ local Window = Windui:CreateWindow({
 })
 
 local Config = Window.ConfigManager
-function Config:Save()
+function Config.Save()
 	if isfile(saveFlag) then
 		default:Save()
 	end
 end
 
-local Modules = {}
-function Modules:Load(file)
-	if Modules[file] then
-		return Modules[file]
-	end
-
-	local cache = Window.Folder .. "/" .. file
-	local content = isfile(cache) and readfile(cache)
-	if not content then
-		content = game:HttpGet(Repository .. file)
-		writefile(cache, content)
-	end
-
-	local success, loadedModule = pcall(loadstring(content))
-	if success and loadedModule then
-		Modules[file] = loadedModule
-		Modules[file]:Load()
-		return Modules[file]
-	else
-		warn("Failed to load module: " .. file)
-		return nil
-	end
-end
-
-function Modules:Unload(moduleName)
-	if not Modules[moduleName] then
-		return
-	end
-
-	if Modules[moduleName].Unload then
-		Modules[moduleName]:Unload()
-	end
-	Modules[moduleName] = nil
-end
-
-Modules:Load("universal/utils.lua")
-local Utils = Modules["universal/utils.lua"]
+local Utils = Modules:Load("universal/utils.lua")
 local default = Config:CreateConfig("default")
-local saveFlag = Window.Folder .. "/config/autosave"
-local loadFlag = Window.Folder .. "/config/autoload"
+local saveFlag = Folder .. "/flags/autosave"
+local loadFlag = Folder .. "/flags/autoload"
 
 local function warnUser()
-	Windui:Notify({
+	Wind:Notify({
 		Title = "Warning",
 		Content = "Changing the default config might open you up to detections and or loss of functionality, proceed with caution!",
 		Duration = 6,
@@ -142,6 +139,7 @@ end
 
 local function moduleToggle(tab, title, configSection, modulePath)
 	tab:Toggle({
+	  Flag = configSection,
 		Title = title,
 		Value = getgenv()[configSection].enabled,
 		Callback = function(state)
@@ -158,6 +156,7 @@ end
 
 local function configToggle(tab, title, desc, configSection, configKey)
 	tab:Toggle({
+	  Flag = configKey,
 		Title = title,
 		Desc = desc,
 		Value = getgenv()[configSection][configKey],
@@ -170,6 +169,7 @@ end
 
 local function configSlider(tab, title, desc, configSection, configKey, min, max, step, defaultVal)
 	tab:Slider({
+	  Flag = configKey,
 		Title = title,
 		Desc = desc,
 		Step = step,
@@ -187,6 +187,7 @@ end
 
 local function configDrop(tab, title, desc, configSection, configKey, values)
 	tab:Dropdown({
+	  Flag = configKey,
 		Title = title,
 		Desc = desc,
 		Values = values,
@@ -264,7 +265,7 @@ do
 		Callback = function(option)
 			getgenv().aimConfig.triggerMode = option
 			if string.find(option, "mouse") and not Input.MouseEnabled then
-				Windui:Notify({
+				Wind:Notify({
 					Title = "Warning",
 					Content = "Your game input might interrupt when triggering as it will change the current input type to mouse and keyboard.",
 					Duration = 4,
@@ -273,7 +274,7 @@ do
 			end
 
 			if option == "closure" then
-				Windui:Notify({
+				Wind:Notify({
 					Title = "Info",
 					Content = "Use this only as a last resort, it will try to call an user defined triggerClosure function from the aimConfig to handle triggering.",
 					Duration = 10,
@@ -292,7 +293,7 @@ do
 			Window:Close()
 
 			Utils.scanElements()
-			Windui:Notify({
+			Wind:Notify({
 				Title = "Button Selection",
 				Content = "Press a button to select it",
 				Duration = 4,
@@ -489,7 +490,7 @@ do
 	})
 
 	local themes = {}
-	for theme in pairs(Windui:GetThemes()) do
+	for theme in Wind:GetThemes() do
 		table.insert(themes, theme)
 	end
 	table.sort(themes)
@@ -498,7 +499,32 @@ do
 		Title = "Theme",
 		Values = themes,
 		Callback = function(option)
-			Windui:SetTheme(option)
+			Wind:SetTheme(option)
+			Config:Save()
+		end,
+	})
+	
+	Settings:Input({
+    Title = "Profile Name",
+    Desc = "Creates a new profile, if needed",
+    Type = "Input",
+    Placeholder = "default",
+    Callback = function(input) 
+      default = Config:CreateConfig(input)
+    end
+  })
+
+  local profiles = {}
+	for _, profile in listfiles(Assets) do
+		table.insert(profiles, string.split(profile, ".")[1])
+	end
+	table.sort(profiles)
+
+  Settings:Dropdown({
+		Title = "Select Profile",
+		Values = profiles,
+		Callback = function(option)
+			default = Config:CreateConfig(option)
 			Config:Save()
 		end,
 	})
@@ -565,7 +591,7 @@ do
 
 	Settings:Paragraph({
 		Title = "Footagesus",
-		Desc = "The main developer of WindUI, a bleeding-edge UI library for Roblox.",
+		Desc = "The main developer of Wind, a bleeding-edge UI library for Roblox.",
 	})
 end
 
@@ -579,7 +605,7 @@ do
 	local latest = game:HttpGet(Repository .. "version")
 	if current and current ~= latest then
 		Window:Close()
-		Windui:Popup({
+		Wind:Popup({
 			Title = "Version Manager",
 			Icon = "download",
 			Content = "A new Wildcard version is available, do you wish to install it?",
@@ -593,6 +619,7 @@ do
 					Title = "Yes",
 					Callback = function()
 						writefile(version, latest)
+						delfolder(Assets)
 						Window:Open()
 					end,
 					Variant = "Primary",

@@ -81,12 +81,17 @@ Values that are mutable at runtime and functions - camel case
 
 3. File Structure and Definitions
 All definitions — service references, constants and variable initializations must appear at the top of every Lua file, preferably in this order.
+Method declarations - must be done with the index syntax and not the colon syntax
 
 Example:
 ```lua
 local Service = game:GetService("UserInputService")
 local LITERAL = "arbitrary value"
-local mutableValue = nil -- or the initial value
+local mutableValue = {} -- or the initial value
+
+function mutableValue.New()
+  -- Like this
+end
 ```
 
 ---

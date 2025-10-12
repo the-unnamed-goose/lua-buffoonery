@@ -94,8 +94,8 @@ Players.PlayerRemoving:Connect(function(plr)
 	visible[plr] = nil
 end)
 
-local oldNamecall
-oldNamecall = hookmetamethod(
+local worldroot
+worldroot = hookmetamethod(
 	workspace,
 	"__namecall",
 	newcclosure(function(...)
@@ -108,7 +108,7 @@ oldNamecall = hookmetamethod(
 			local target = findTarget(origin, direction)
 			if target then
 				args[3] = getDirection(origin, target.Position) * direction.Magnitude
-				return oldNamecall(unpack(args))
+				return worldroot(unpack(args))
 			end
 		-- https://create.roblox.com/docs/reference/engine/classes/WorldRoot#findPartOnRay
 		elseif
@@ -123,9 +123,9 @@ oldNamecall = hookmetamethod(
 			local target = findTarget(origin, direction)
 			if target then
 				args[2] = Ray.new(origin, getDirection(origin, target.Position) * direction.Magnitude)
-				return oldNamecall(unpack(args))
+				return worldroot(unpack(args))
 			end
 		end
-		return oldNamecall(...)
+		return worldroot(...)
 	end)
 )

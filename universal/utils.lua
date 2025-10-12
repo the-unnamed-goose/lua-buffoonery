@@ -214,7 +214,7 @@ function Module.updateTriggerAction()
 	end
 end
 
-function Module:Load()
+function Module.Load()
 	if Module.Connections then
 		return
 	end
@@ -233,7 +233,7 @@ function Module:Load()
 	)
 end
 
-function Module:Unload()
+function Module.Unload()
 	if not Module.Connections then
 		return
 	end
