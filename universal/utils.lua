@@ -1,4 +1,4 @@
--- utils.lua
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
 local Run = game:GetService("RunService")
 
