@@ -1,4 +1,4 @@
--- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
 local Run = game:GetService("RunService")
 local Replicated = game:GetService("ReplicatedStorage")
@@ -9,12 +9,15 @@ local throwHitRemote = Replicated.Remotes:WaitForChild("ThrowHit")
 local shootRemote = Replicated.Remotes:WaitForChild("ShootGun")
 local WEAPON_TYPE = { gun = "Gun_Equip", knife = "Knife_Equip" }
 
--- Uncomment this paragraph if you want to use the script standalone
--- getgenv().killButton = { gun = false, knife = false }
--- getgenv().killLoop = { gun = false, knife = false }
+getgenv().controllers = getgenv().controllers
+	or {
+		knifeLocked = false,
+		gunLocked = false,
+		toolsLocked = false,
+		gunCooldown = 0,
+	}
 
 local player = Players.player
-local lock = { gun = false, knife = false }
 local enemyCache = {}
 
 function updateCache()
@@ -50,7 +53,7 @@ local function equipWeapon(weaponType)
 	end
 end
 
-local function killAllKnife()
+local function killKnife()
 	local character = player.Character
 	if not character then
 		return
@@ -73,7 +76,7 @@ local function killAllKnife()
 	end
 end
 
-local function killAllGun()
+local function killGun()
 	local character = player.Character
 	if not character then
 		return
@@ -90,70 +93,91 @@ local function killAllGun()
 	end
 end
 
-if player.Character then
-	updateCache()
+local Module = {}
+function Module.Load()
+	if Module.Connections then
+		return
+	end
+
+	Module.Connections = {}
+	table.insert(Module.Connections, Run.Heartbeat:Connect(updateCache))
+	table.insert(
+		Module.Connections,
+		player.CharacterAdded:Connect(function()
+			local character = player.Character
+			if not character then
+				return
+			end
+
+			getgenv().controllers.gunLocked = true
+			getgenv().controllers.knifeLocked = true
+
+			if getgenv().killLoop.gun then
+				equipWeapon(WEAPON_TYPE.gun)
+			elseif getgenv().killLoop.knife then
+				equipWeapon(WEAPON_TYPE.knife)
+			end
+
+			local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 3)
+			if not humanoidRootPart or not player:GetAttribute("Match") then
+				return
+			end
+
+			local anchoredConnection = humanoidRootPart:GetPropertyChangedSignal("Anchored"):Connect(function()
+				if not humanoidRootPart.Anchored then
+					if getgenv().killLoop.gun then
+						getgenv().controllers.gunLocked = false
+					elseif getgenv().killLoop.knife then
+						getgenv().controllers.knifeLocked = false
+					end
+
+					if anchoredConnection then
+						anchoredConnection:Disconnect()
+					end
+				end
+			end)
+		end)
+	)
 end
 
-local Connections = {}
-Connections[0] = Run.Heartbeat:Connect(updateCache)
-
-Connections[1] = Run.Heartbeat:Connect(function()
-	if getgenv().killButton.knife then
-		equipWeapon(WEAPON_TYPE.knife)
-		killAllKnife()
-		getgenv().killButton.knife = false
-	end
-
-	if getgenv().killButton.gun then
-		equipWeapon(WEAPON_TYPE.gun)
-		killAllGun()
-		getgenv().killButton.gun = false
-	end
-end)
-
-Connections[2] = Run.RenderStepped:Connect(function()
-	if getgenv().killLoop.gun and not lock.gun then
-		killAllGun()
-	end
-
-	if getgenv().killLoop.knife and not lock.knife then
-		killAllKnife()
-	end
-end)
-
-Connections[3] = player.CharacterAdded:Connect(function()
-	local character = player.Character
-	if not character then
+function Module.Unload()
+	if not Module.Connections then
 		return
 	end
 
-	lock.gun = true
-	lock.knife = true
-
-	if getgenv().killLoop.gun then
-		equipWeapon(WEAPON_TYPE.gun)
-	elseif getgenv().killLoop.knife then
-		equipWeapon(WEAPON_TYPE.knife)
-	end
-
-	local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 3)
-	if not humanoidRootPart or not player:GetAttribute("Match") then
-		return
-	end
-
-	local anchoredConnection = humanoidRootPart:GetPropertyChangedSignal("Anchored"):Connect(function()
-		if not humanoidRootPart.Anchored then
-			if getgenv().killLoop.gun then
-				lock.gun = false
-			elseif getgenv().killLoop.knife then
-				lock.knife = false
-			end
-
-			if anchoredConnection then
-				anchoredConnection:Disconnect()
-			end
+	for _, connection in ipairs(Module.Connections) do
+		if connection and connection.Disconnect then
+			connection:Disconnect()
 		end
-	end)
-end)
+	end
+end
+
+function Module.gunButton()
+	equipWeapon(WEAPON_TYPE.gun)
+	killGun()
+end
+
+function Module.knifeButton()
+	equipWeapon(WEAPON_TYPE.knife)
+	killKnife()
+end
+
+function Module.gunToggle()
+	table.insert(
+		Module.Connections,
+		Run.RenderStepped:Connect(function()
+			killGun()
+		end)
+	)
+end
+
+function Module.knifeToggle()
+	table.insert(
+		Module.Connections,
+		Run.RenderStepped:Connect(function()
+			killKnife()
+		end)
+	)
+end
 
 return Connections

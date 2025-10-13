@@ -1,4 +1,4 @@
--- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Replicated = game:GetService("ReplicatedStorage")
 local Collection = game:GetService("CollectionService")
 local Tween = game:GetService("TweenService")
@@ -8,28 +8,35 @@ local Run = game:GetService("RunService")
 
 getgenv().aimConfig = getgenv().aimConfig
 	or {
-		MAX_DISTANCE = 250,
-		MAX_VELOCITY = 40,
-		VISIBLE_PARTS = 4,
-		CAMERA_CAST = true,
-		FOV_CHECK = true,
-		REACTION_TIME = 0.18,
-		ACTION_TIME = 0.32,
-		AUTO_EQUIP = true,
-		EQUIP_LOOP = 0.3,
-		NATIVE_UI = true,
-		DEVIATION_ENABLED = true,
-		BASE_DEVIATION = 2.05,
-		DISTANCE_FACTOR = 0.6,
-		VELOCITY_FACTOR = 0.9,
-		ACCURACY_BUILDUP = 0.14,
-		MIN_DEVIATION = 1,
-		RAYCAST_DISTANCE = 1000,
+		maxDistance = 250,
+		maxVelocity = 40,
+		visibleParts = 4,
+		cameraCast = true,
+		fovCheck = true,
+		reactionTime = 0.18,
+		actionTime = 0.32,
+		autoEquip = true,
+		equipInterval = 0.3,
+		nativeUI = true,
+		deviation = true,
+		baseDeviation = 2.05,
+		distanceFactor = 0.6,
+		velocityFactor = 0.9,
+		accuracyBuildup = 0.14,
+		minDeviation = 1,
+	}
+
+getgenv().controllers = getgenv().controllers
+	or {
+		knifeLocked = false,
+		gunLocked = false,
+		toolsLocked = false,
+		gunCooldown = 0,
 	}
 
 local WEAPON_TYPE = { GUN = "Gun_Equip", KNIFE = "Knife_Equip" }
 local FOV_ANGLE = math.cos(math.rad(45))
-local MAX_SQUARE = getgenv().aimConfig.MAX_DISTANCE * getgenv().aimConfig.MAX_DISTANCE
+local MAX_SQUARE = getgenv().aimConfig.maxDistance * getgenv().aimConfig.maxDistance
 
 local camera = Workspace.CurrentCamera
 local player = Players.LocalPlayer
@@ -44,10 +51,6 @@ local throwStartRemote = remotes:WaitForChild("ThrowStart")
 local throwHitRemote = remotes:WaitForChild("ThrowHit")
 local bulletRenderer = require(modules:WaitForChild("BulletRenderer"))
 local knifeController = require(modules:WaitForChild("KnifeProjectileController"))
-
-getgenv().controller = {}
-getgenv().controller.lock = { gun = false, knife = false, general = false }
-getgenv().controller.gunCooldown = 0
 
 local raycastParams = RaycastParams.new()
 raycastParams.IgnoreWater = true
@@ -94,7 +97,7 @@ local function normalRandom()
 end
 
 local function applyAimDeviation(originalPos, muzzlePos, targetChar)
-	if not getgenv().aimConfig.DEVIATION_ENABLED then
+	if not getgenv().aimConfig.deviation then
 		return originalPos, nil
 	end
 
@@ -106,7 +109,7 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	lastShotTime = currentTime
 
 	if timeSinceLastShot < 2 then
-		accuracyBonus = math.min(accuracyBonus + getgenv().aimConfig.ACCURACY_BUILDUP, 1.0)
+		accuracyBonus = math.min(accuracyBonus + getgenv().aimConfig.accuracyBuildup, 1.0)
 	else
 		accuracyBonus = math.max(accuracyBonus - 0.1, 0)
 	end
@@ -118,7 +121,7 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 		return originalPos, nil
 	end
 
-	local distanceFactor = (distance / getgenv().aimConfig.MAX_DISTANCE) * getgenv().aimConfig.DISTANCE_FACTOR
+	local distanceFactor = (distance / getgenv().aimConfig.maxDistance) * getgenv().aimConfig.distanceFactor
 
 	local velocityFactor = 0
 	if targetChar then
@@ -126,14 +129,13 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 		local hrp = targetChar:FindFirstChild("HumanoidRootPart")
 		if humanoid and hrp then
 			local horizontalVelocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z).Magnitude
-			velocityFactor = (horizontalVelocity / getgenv().aimConfig.MAX_VELOCITY)
-				* getgenv().aimConfig.VELOCITY_FACTOR
+			velocityFactor = (horizontalVelocity / getgenv().aimConfig.maxVelocity) * getgenv().aimConfig.velocityFactor
 		end
 	end
 
-	local baseDeviation = getgenv().aimConfig.BASE_DEVIATION
+	local baseDeviation = getgenv().aimConfig.baseDeviation
 	local totalDeviation = baseDeviation + distanceFactor + velocityFactor - accuracyBonus
-	totalDeviation = math.max(totalDeviation, getgenv().aimConfig.MIN_DEVIATION)
+	totalDeviation = math.max(totalDeviation, getgenv().aimConfig.minDeviation)
 
 	local maxDeviationRadians = math.rad(totalDeviation)
 	local horizontalDeviation = normalRandom() * maxDeviationRadians * 0.6
@@ -164,7 +166,7 @@ local function applyAimDeviation(originalPos, muzzlePos, targetChar)
 	misfireRayParams.FilterDescendantsInstances = safeFilterList
 
 	local rayResult =
-		Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.RAYCAST_DISTANCE, misfireRayParams)
+		Workspace:Raycast(muzzlePos, deviatedDirection * getgenv().aimConfig.maxDistance, misfireRayParams)
 
 	if shotCount >= 1000 then
 		shotCount = 0
@@ -217,7 +219,7 @@ local function isValidTarget(targetPlayer, localHrp)
 		or hum.Health <= 0
 		or not head
 		or not hrp
-		or hrp.Velocity.Magnitude >= getgenv().aimConfig.MAX_VELOCITY
+		or hrp.Velocity.Magnitude >= getgenv().aimConfig.maxVelocity
 	then
 		return false
 	end
@@ -229,7 +231,7 @@ local function isValidTarget(targetPlayer, localHrp)
 
 	local toTarget = (hrp.Position - camera.CFrame.Position).Unit
 	local isInFov = camera.CFrame.LookVector:Dot(toTarget) >= FOV_ANGLE
-	return not getgenv().aimConfig.FOV_CHECK or isInFov
+	return not getgenv().aimConfig.fovCheck or isInFov
 end
 
 local function getVisibleParts(targetChar, localHrp)
@@ -253,8 +255,8 @@ local function getVisibleParts(targetChar, localHrp)
 				local visibleFromHRP = not resultFromHRP
 				local _, onScreen = camera:WorldToViewportPoint(partPos)
 
-				if visibleFromHRP and (not getgenv().aimConfig.FOV_CHECK or onScreen) then
-					if not getgenv().aimConfig.CAMERA_CAST then
+				if visibleFromHRP and (not getgenv().aimConfig.fovCheck or onScreen) then
+					if not getgenv().aimConfig.cameraCast then
 						table.insert(visibleParts, part)
 					else
 						local directionFromCamera = partPos - cameraPos
@@ -293,14 +295,14 @@ end
 
 local function findBestTarget(localHrp)
 	local bestTarget, bestPart, bestKnifeTarget, bestKnifePoint = nil, nil, nil, nil
-	local closestDist = getgenv().aimConfig.MAX_DISTANCE + 1
+	local closestDist = getgenv().aimConfig.maxDistance + 1
 
 	for _, targetPlayer in ipairs(Players:GetPlayers()) do
 		if isValidTarget(targetPlayer, localHrp) then
 			local targetChar = targetPlayer.Character
 			local visible = getVisibleParts(targetChar, localHrp)
 
-			if #visible >= getgenv().aimConfig.VISIBLE_PARTS then
+			if #visible >= getgenv().aimConfig.visibleParts then
 				local hrp = targetChar:FindFirstChild("HumanoidRootPart")
 				if hrp then
 					local dist = (hrp.Position - localHrp.Position).Magnitude
@@ -330,7 +332,7 @@ local function findBestTarget(localHrp)
 end
 
 local function updateUIHighlight(tool)
-	if not getgenv().aimConfig.NATIVE_UI or not tool then
+	if not getgenv().aimConfig.nativeUI or not tool then
 		return
 	end
 
@@ -354,7 +356,7 @@ local function updateUIHighlight(tool)
 end
 
 local function renderCooldown(tool)
-	if not tool or not getgenv().aimConfig.NATIVE_UI then
+	if not tool or not getgenv().aimConfig.nativeUI then
 		return
 	end
 
@@ -397,26 +399,26 @@ local function renderCooldown(tool)
 end
 
 local function fireGun(targetPos, hitPart, localHrp, animator)
-	if getgenv().controller.lock.gun then
+	if getgenv().controllers.gunLocked then
 		return
 	end
-	getgenv().controller.lock.gun = true
+	getgenv().controllers.gunLocked = true
 
 	local gun = getWeapon(WEAPON_TYPE.GUN)
 	if not gun then
-		getgenv().controller.lock.gun = false
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
 	local cooldown = gun:GetAttribute("Cooldown") or 2.5
-	if tick() - getgenv().controller.gunCooldown < cooldown then
-		getgenv().controller.lock.gun = false
+	if tick() - getgenv().controllers.gunCooldown < cooldown then
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
 	local muzzle = gun:FindFirstChild("Muzzle", true)
 	if not muzzle then
-		getgenv().controller.lock.gun = false
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
@@ -427,7 +429,7 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 	local targetChar = hitPart and hitPart.Parent
 	if targetChar then
 		local visibleParts = getVisibleParts(targetChar, localHrp)
-		if #visibleParts >= getgenv().aimConfig.VISIBLE_PARTS then
+		if #visibleParts >= getgenv().aimConfig.visibleParts then
 			for _, part in ipairs(visibleParts) do
 				local partName = part.Name
 				if partName == "UpperTorso" or partName == "HumanoidRootPart" then
@@ -447,28 +449,28 @@ local function fireGun(targetPos, hitPart, localHrp, animator)
 	bulletRenderer(muzzlePos, finalPos, "Default")
 	shootRemote:FireServer(muzzlePos, finalPos, actualHitPart or hitPart, finalPos)
 
-	getgenv().controller.gunCooldown = tick()
+	getgenv().controllers.gunCooldown = tick()
 	renderCooldown(gun)
 
 	task.wait(animTrack.Length or 0.5)
-	getgenv().controller.lock.gun = false
+	getgenv().controllers.gunLocked = false
 end
 
 local function throwKnife(targetPos, hitPart, localHrp, animator)
-	if getgenv().controller.lock.knife then
+	if getgenv().controllers.knifeLocked then
 		return
 	end
-	getgenv().controller.lock.knife = true
+	getgenv().controllers.knifeLocked = true
 
 	local knife = getWeapon(WEAPON_TYPE.KNIFE)
 	if not knife then
-		getgenv().controller.lock.knife = false
+		getgenv().controllers.knifeLocked = false
 		return
 	end
 
 	local handle = knife:FindFirstChild("RightHandle")
 	if not handle then
-		getgenv().controller.lock.knife = false
+		getgenv().controllers.knifeLocked = false
 		return
 	end
 
@@ -495,7 +497,7 @@ local function throwKnife(targetPos, hitPart, localHrp, animator)
 			throwHitRemote:FireServer(result.Instance, result.Position)
 		end
 		task.wait(1)
-		getgenv().controller.lock.knife = false
+		getgenv().controllers.knifeLocked = false
 	end)
 end
 
@@ -551,26 +553,26 @@ local function equipWeapon(weaponType, callback)
 
 	if currentTool then
 		humanoid:UnequipTools()
-		getgenv().controller.lock.general = true
-		task.wait(getgenv().aimConfig.ACTION_TIME)
+		getgenv().controllers.toolsLocked = true
+		task.wait(getgenv().aimConfig.actionTime)
 		if targetTool.Parent ~= player.Backpack then
-			getgenv().controller.lock.general = false
+			getgenv().controllers.toolsLocked = false
 			if callback then
 				callback(false, "Tool no longer available")
 			end
 			return
 		end
 		humanoid:EquipTool(targetTool)
-		task.wait(getgenv().aimConfig.ACTION_TIME)
-		getgenv().controller.lock.general = false
+		task.wait(getgenv().aimConfig.actionTime)
+		getgenv().controllers.toolsLocked = false
 		if callback then
 			callback(true, targetTool)
 		end
 	else
 		humanoid:EquipTool(targetTool)
-		getgenv().controller.lock.general = true
-		task.wait(getgenv().aimConfig.ACTION_TIME)
-		getgenv().controller.lock.general = false
+		getgenv().controllers.toolsLocked = true
+		task.wait(getgenv().aimConfig.actionTime)
+		getgenv().controllers.toolsLocked = false
 		if callback then
 			callback(true, targetTool)
 		end
@@ -578,16 +580,16 @@ local function equipWeapon(weaponType, callback)
 end
 
 local function handleAutoEquip()
-	if not getgenv().aimConfig.AUTO_EQUIP then
+	if not getgenv().aimConfig.autoEquip then
 		return
 	end
 
-	if tick() - equipTimer < getgenv().aimConfig.EQUIP_LOOP then
+	if tick() - equipTimer < getgenv().aimConfig.equipInterval then
 		return
 	end
 	equipTimer = tick()
 
-	if getgenv().controller.lock.general then
+	if getgenv().controllers.toolsLocked then
 		return
 	end
 
@@ -616,9 +618,9 @@ local function handleAutoEquip()
 
 	local gunAvailable = gunEquipped or gunInBackpack
 	local gunReady = gunAvailable
-		and not getgenv().controller.lock.gun
+		and not getgenv().controllers.gunLocked
 		and (
-			tick() - getgenv().controller.gunCooldown
+			tick() - getgenv().controllers.gunCooldown
 			>= ((gunEquipped or gunInBackpack):GetAttribute("Cooldown") or 2.5)
 		)
 
@@ -633,7 +635,7 @@ local function handleAutoEquip()
 		end
 	end
 
-	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controller.lock.knife
+	local knifeAvailable = (knifeEquipped or knifeInBackpack) and not getgenv().controllers.knifeLocked
 
 	if gunReady and not gunEquipped then
 		equipWeapon(WEAPON_TYPE.GUN, function(success, gun)
@@ -675,21 +677,21 @@ local function handleCombat()
 		return
 	end
 
-	task.wait(getgenv().aimConfig.REACTION_TIME)
+	task.wait(getgenv().aimConfig.reactionTime)
 	if not isValidTarget(bestTarget, hrp) then
 		return
 	end
 
 	local equipType = weapon:GetAttribute("EquipAnimation")
 	if equipType == WEAPON_TYPE.GUN then
-		local gunReady = not getgenv().controller.lock.gun
-			and (tick() - getgenv().controller.gunCooldown >= (weapon:GetAttribute("Cooldown") or 2.5))
+		local gunReady = not getgenv().controllers.gunLocked
+			and (tick() - getgenv().controllers.gunCooldown >= (weapon:GetAttribute("Cooldown") or 2.5))
 		if gunReady and bestPart and bestPart.Parent then
 			fireGun(bestPart.Position, bestPart, hrp, animator)
 		end
 	elseif equipType == WEAPON_TYPE.KNIFE then
 		if
-			not getgenv().controller.lock.knife
+			not getgenv().controllers.knifeLocked
 			and bestKnifeTarget
 			and bestKnifePoint
 			and isValidTarget(bestKnifeTarget, hrp)
@@ -705,10 +707,28 @@ end
 if player.Character then
 	initializePlayer()
 end
+local Module = {}
+function Module.Load()
+	if Module.Connections then
+		return
+	end
 
-local Connections = {}
-Connections[0] = Run.RenderStepped:Connect(handleCombat)
-Connections[1] = Run.Heartbeat:Connect(handleAutoEquip)
-Connections[2] = player.CharacterAdded:Connect(initializePlayer)
+	Module.Connections = {}
+	table.insert(Module.Connections, Run.RenderStepped:Connect(handleCombat))
+	table.insert(Module.Connections, Run.Heartbeat:Connect(handleAutoEquip))
+	table.insert(Module.Connections, player.CharacterAdded:Connect(initializePlayer))
+end
+
+function Module.Unload()
+	if not Module.Connections then
+		return
+	end
+
+	for _, connection in ipairs(Module.Connections) do
+		if connection and connection.Disconnect then
+			connection:Disconnect()
+		end
+	end
+end
 
 return Connections

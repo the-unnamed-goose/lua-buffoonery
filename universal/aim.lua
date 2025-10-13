@@ -29,7 +29,7 @@ getgenv().aimConfig = getgenv().aimConfig
 
 		useRay = true,
 		respectTeams = false,
-		lockCamera = true,
+		checkClosure = nil,
 
 		triggerBot = true,
 		triggerMode = "button",
@@ -55,7 +55,7 @@ task.spawn(function()
 		"__newindex",
 		newcclosure(function(self, key, value, ...)
 			if getgenv().aimConfig.enabled and not checkcaller() and getthreadidentity() < 3 and key == "CFrame" then
-				if currentTarget and getgenv().aimConfig.lockCamera then
+				if currentTarget and getgenv().aimConfig.useHook then
 					local rotation = camera.CFrame - camera.CFrame.Position
 					return cameraHook(self, key, rotation + value.Position, ...)
 				end
@@ -148,6 +148,7 @@ local function applyJitter(direction, jitterOffset)
 	local right = direction:Cross(Vector3.new(0, 1, 0)).Unit
 	local up = right:Cross(direction).Unit
 
+  -- It's Jitterin' time
 	local jittered = direction + right * jitterOffset.X + up * jitterOffset.Y
 	return jittered.Unit
 end
@@ -208,15 +209,20 @@ local function findTarget()
 	local bestTarget = nil
 	local bestDot = -1
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		if not isValid(player) then
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if not isValid(plr) then
 			continue
 		end
 
-		local character = player.Character
+		local character = plr.Character
 		local part = character:FindFirstChild(config.targetPart)
 		if not part then
 			continue
+		end
+		
+		local closure = config.checkClosure
+		if type(closure) == "function" and not closure(plr, character, part) then
+		  continue
 		end
 
 		local distance = (camPos - part.Position).Magnitude
@@ -243,7 +249,7 @@ local function findTarget()
 		if fovCheck and dot > bestDot then
 			bestDot = dot
 			bestTarget = {
-				player = player,
+				player = plr,
 				character = character,
 				part = part,
 				position = partPos,
@@ -351,7 +357,7 @@ local function aimAt(targetPos, deltaTime, isNewTarget)
 		local currentLook = currentCF.LookVector
 		local smoothedLook = currentLook:Lerp(jitteredLook, smooth + ease * 0.5)
 
-		if config.lockCamera and currentTarget then
+		if config.useHook and currentTarget then
 			camera.CFrame = CFrame.new(camPos, camPos + smoothedLook)
 		else
 			camera.CFrame = CFrame.new(camPos, camPos + smoothedLook)

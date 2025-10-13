@@ -12,8 +12,13 @@ local params = RaycastParams.new()
 params.IgnoreWater = true
 params.FilterType = Enum.RaycastFilterType.Blacklist
 
-local MAX_ANGLE = 15
-local angleCos = math.cos(math.rad(MAX_ANGLE))
+getgenv().silentConfig = getgenv().silentConfig or {
+  maxAngle = 15,
+  maxCosine = math.cos(math.rad(maxAngle)), -- used for performance reasons
+  targetPart = "Head",
+  rootPart = "HumanoidRootPart", -- To be used on custom characters
+  checkClosure = nil,
+}
 
 local function getDirection(origin, position)
 	return (position - origin).Unit
@@ -26,7 +31,7 @@ local function getAlpha(vec1, vec2)
 end
 
 local function findTarget(origin, direction)
-	local closest, minAngle = nil, MAX_ANGLE
+	local closest, minAngle = nil, getgenv().silentConfig.maxAngle
 	local directionUnit = direction.Unit
 	local localCharacter = player.Character or findChild(workspace, player.Name)
 
@@ -36,16 +41,21 @@ local function findTarget(origin, direction)
 		end
 
 		local character = plr.Character or findChild(workspace, plr.Name)
-		local part = character and findChild(character, "Head")
-		local humanoid = character and findChild(character, "Humanoid")
+		local part = character and findChild(character, getgenv().silentConfig.targetPart)
+		local humanoid = character and findChild(character, getgenv().silentConfig.rootPart)
 		if not part or not humanoid or not (humanoid.Health > 0) then
 			continue
+		end
+		
+		local closure = config.checkClosure
+		if type(closure) == "function" and not closure(plr, character, part) then
+		  continue
 		end
 
 		local targetDirection = getDirection(origin, part.Position)
 		local dot = dotProduct(directionUnit, targetDirection)
 
-		if dot <= angleCos then
+		if dot <= getgenv().silentConfig.maxAlpha then
 			continue
 		end
 
@@ -70,8 +80,8 @@ Run.Heartbeat:Connect(function()
 
 		local localCharacter = player.Character or findChild(workspace, player.Name)
 		local character = plr.Character or findChild(workspace, plr.Name)
-		local origin = localCharacter and findChild(localCharacter, "HumanoidRootPart")
-		local part = character and findChild(character, "Head")
+		local origin = localCharacter and findChild(localCharacter, getgenv().silentConfig.rootPart)
+		local part = character and findChild(character, getgenv().silentConfig.targetPar)
 		if not origin or not part then
 			continue
 		end

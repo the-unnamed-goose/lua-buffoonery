@@ -1,4 +1,4 @@
--- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Replicated = game:GetService("ReplicatedStorage")
 local Input = game:GetService("UserInputService")
 local Players = game:GetService("Players")
@@ -15,10 +15,13 @@ local KnifeProjectileController = require(Replicated.Modules.KnifeProjectileCont
 local Hitbox = require(Replicated.Modules.Hitbox)
 local Tags = require(Replicated.Modules.Tags)
 
---[[ Uncomment this paragraph if you want to use the script standalone
-getgenv().controller = {}
-getgenv().controller.lock = { knife = false, general = false }
---]]
+getgenv().controllers = getgenv().controllers
+	or {
+		knifeLocked = false,
+		gunLocked = false,
+		toolsLocked = false,
+		gunCooldown = 0,
+	}
 
 local THROW_ANIMATION_SPEED = 1.4
 local CHARGE_DELAY = 0.25
@@ -106,7 +109,7 @@ local function setKnifeHandleTransparency(tool, transparency)
 end
 
 local function throwKnife(tool, targetPosition, isManualActivation)
-	if getgenv().controller.lock.knife or getgenv().controller.lock.general then
+	if getgenv().controllers.knifeLocked or getgenv().controllers.toolsLocked then
 		return
 	end
 
@@ -219,7 +222,7 @@ local function handleStabInput(tool)
 	end))
 
 	maid:GiveTask(tool.Activated:Connect(function()
-		if getgenv().controller.lock.knife or getgenv().controller.lock.general then
+		if getgenv().controllers.knifeLocked or getgenv().controllers.toolsLocked then
 			return
 		end
 

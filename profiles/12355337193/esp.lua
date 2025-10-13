@@ -1,6 +1,12 @@
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Players = game:GetService("Players")
 local Run = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+
+getgenv().espConfig = getgenv().espConfig or {
+	teammates = false,
+	enemies = true,
+}
 
 local player = Players.LocalPlayer
 local Teams = {
@@ -85,20 +91,42 @@ if player.Character then
 	update()
 end
 
-local Connections = {}
-Connections[0] = player.CharacterAdded:Connect(update)
-Connections[1] = Run.Heartbeat:Connect(function()
-	if not player:GetAttribute("Match") then
+local Module = {}
+function Module.Load()
+	if Module.Connections then
 		return
 	end
 
-	if getgenv().espTeammates then
-		renderTeam(Teams.Teammates)
+	Module.Connections = {}
+	table.insert(Module.Connections, player.CharacterAdded:Connect(update))
+	table.insert(
+		Module.Connections,
+		Run.Heartbeat:Connect(function()
+			if not player:GetAttribute("Match") then
+				return
+			end
+
+			if getgenv().espTeammates then
+				renderTeam(Teams.Teammates)
+			end
+
+			if getgenv().espEnemies then
+				renderTeam(Teams.Enemies)
+			end
+		end)
+	)
+end
+
+function Module.Unload()
+	if not Module.Connections then
+		return
 	end
 
-	if getgenv().espEnemies then
-		renderTeam(Teams.Enemies)
+	for _, connection in ipairs(Module.Connections) do
+		if connection and connection.Disconnect then
+			connection:Disconnect()
+		end
 	end
-end)
+end
 
 return Connections

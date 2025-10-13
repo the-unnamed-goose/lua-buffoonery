@@ -1,4 +1,4 @@
--- This file is licensed under the Creative Commons Attribution 4.0 International License. See https://creativecommons.org/licenses/by/4.0/legalcode.txt for details.
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
 local Replicated = game:GetService("ReplicatedStorage")
 local Input = game:GetService("UserInputService")
 local Players = game:GetService("Players")
@@ -11,11 +11,13 @@ local CharacterRayOrigin = require(Replicated.Modules.CharacterRayOrigin)
 local BulletRenderer = require(Replicated.Modules.BulletRenderer)
 local Tags = require(Replicated.Modules.Tags)
 
---[[ Uncomment this paragraph if you want to use the script standalone
-getgenv().controller = {}
-getgenv().controller.lock = { gun = false, general = false }
-getgenv().controller.gunCooldown = 0
---]]
+getgenv().controllers = getgenv().controllers
+	or {
+		knifeLocked = false,
+		gunLocked = false,
+		toolsLocked = false,
+		gunCooldown = 0,
+	}
 
 local MUZZLE_ATTACHMENT_NAME = "Muzzle"
 local FIRE_SOUND_NAME = "Fire"
@@ -36,32 +38,31 @@ local function canShoot(tool)
 	if not cooldown then
 		return true
 	end
-	if getgenv().controller.gunCooldown == 0 then
+	if getgenv().controllers.gunCooldown == 0 then
 		return true
 	end
-	return (tick() - getgenv().controller.gunCooldown) >= cooldown
+	return (tick() - getgenv().controllers.gunCooldown) >= cooldown
 end
 
 local function shootGun(tool, targetPosition)
-	if getgenv().controller.lock.gun or getgenv().controller.lock.general then
+	if getgenv().controllers.gunLocked or getgenv().controllers.toolsLocked then
 		return
 	end
-	getgenv().controller.lock.gun = true
+	getgenv().controllers.gunLocked = true
 
 	if not canShoot(tool) then
-		getgenv().controller.lock.gun = false
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
 	local muzzleAttachment = tool:FindFirstChild(MUZZLE_ATTACHMENT_NAME, true)
 	if not muzzleAttachment then
 		warn("Muzzle attachment not found for gun: " .. tool.Name)
-		getgenv().controller.lock.gun = false
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
-	getgenv().controller.gunCooldown = tick()
-
+	getgenv().controllers.gunCooldown = tick()
 	if not targetPosition then
 		targetPosition = mouse.Hit.Position + (MOUSE_RAYCAST_OFFSET * mouse.UnitRay.Direction)
 	end
@@ -70,7 +71,7 @@ local function shootGun(tool, targetPosition)
 		WeaponRaycast(currentCamera.CFrame.Position, targetPosition, nil, CollisionGroups.SCREEN_RAYCAST)
 	local characterOrigin = CharacterRayOrigin(character)
 	if not characterOrigin then
-		getgenv().controller.lock.gun = false
+		getgenv().controllers.gunLocked = false
 		return
 	end
 
@@ -93,7 +94,7 @@ local function shootGun(tool, targetPosition)
 	local hitInstance = hitResult and hitResult.Instance
 	local hitPosition = hitResult and hitResult.Position
 	shootGunRemote:FireServer(characterOrigin, finalTarget, hitInstance, hitPosition)
-	getgenv().controller.lock.gun = false
+	getgenv().controllers.gunLocked = false
 end
 
 local function handleGunInput(tool)
