@@ -251,6 +251,10 @@ local Store = {
 				value = writefile,
 			},
 			{
+				name = "delfile",
+				value = delfile,
+			},
+			{
 				name = "delfolder",
 				value = delfolder,
 			},
@@ -324,6 +328,10 @@ local Store = {
 			{
 				name = "writefile",
 				value = writefile,
+			},
+			{
+				name = "delfile",
+				value = delfile,
 			},
 			{
 				name = "delfolder",

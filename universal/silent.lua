@@ -15,7 +15,7 @@ params.FilterType = Enum.RaycastFilterType.Blacklist
 getgenv().silentConfig = getgenv().silentConfig
 	or {
 		maxAngle = 15,
-		maxCosine = math.cos(math.rad(maxAngle)), -- used for performance reasons
+		maxCosine = math.cos(math.rad(15)), -- used for performance reasons
 		targetPart = "Head",
 		rootPart = "HumanoidRootPart", -- To be used on custom characters
 		checkClosure = nil,

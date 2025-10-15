@@ -108,9 +108,14 @@ getgenv().bypassConfig = {
 	environment = false,
 }
 
-getgenv().silentConfig = getgenv().silentConfig or {
-	enabled = false,
-}
+getgenv().silentConfig = getgenv().silentConfig
+	or {
+		maxAngle = 15,
+		maxCosine = math.cos(math.rad(15)), -- used for performance reasons
+		targetPart = "Head",
+		rootPart = "HumanoidRootPart", -- To be used on custom characters
+		checkClosure = nil,
+	}
 
 local Window = Wind:CreateWindow({
 	Title = "Wildcard",
@@ -294,6 +299,24 @@ local Silent = Window:Tab({
 })
 
 moduleToggle(Silent, "Silent Aim", "silentConfig", "universal/silent.lua")
+
+Silent:Slider({
+	Flag = "maxAngle",
+	Title = "Max Angle",
+	Value = {
+		Min = 0,
+		Max = 100,
+		Default = getgenv().silentConfig.maxAngle,
+	},
+	Callback = function(val)
+		getgenv().silentConfig.maxAngle = tonumber(val)
+		getgenv().silentConfig.maxCosine = math.cos(math.rad(val))
+		Config:Save()
+	end,
+})
+
+configDrop(Silent, "Target Part", nil, "silentConfig", "targetPart", Utils.getParts())
+configDrop(Silent, "Target Part", nil, "silentConfig", "rootPart", Utils.getParts())
 
 local Aim = Window:Tab({
 	Title = "Aim Bot",
@@ -556,7 +579,7 @@ Visuals:Input({
 Visuals:Keybind({
 	Title = "Keybind Emote",
 	Desc = "Keybind to play the selected emote",
-	Value = "X",
+	Value = "Z",
 	Callback = function()
 		Utils.playAnimation(Utils.resumeAnimation)
 		Config:Save()
@@ -569,7 +592,7 @@ local Settings = Window:Tab({
 	Locked = false,
 })
 
-Settings:Section({ Title = "Configuration" })
+Settings:Section({ Title = "General" })
 Settings:Keybind({
 	Title = "Window toggle",
 	Desc = "Keybind to toggle ui",
@@ -595,9 +618,9 @@ Settings:Dropdown({
 	end,
 })
 
-Settings:Input({
-	Title = "Profile Name",
-	Desc = "Creates a new profile, if needed",
+Settings:Section({ Title = "Configuration" })
+local profileSelector = Settings:Input({
+	Title = "Create Profile",
 	Type = "Input",
 	Placeholder = "default",
 	Callback = function(input)
@@ -616,8 +639,18 @@ Settings:Dropdown({
 	Values = profiles,
 	Callback = function(option)
 		default = Config:CreateConfig(option)
+		profileSelector:Set(option)
 		Config:Save()
 	end,
+})
+
+Settings:Button({
+    Title = "Delete Profile",
+    Callback = function()
+        if default then 
+          delfile(default.Path)
+        end
+    end
 })
 
 Settings:Toggle({
@@ -670,7 +703,7 @@ do
 			Content = "A new Wildcard version is available, do you wish to install it?",
 			Buttons = {
 				{
-					Title = "Remind me later",
+					Title = "Maybe later",
 					Callback = Window.Open,
 					Variant = "Tertiary",
 				},
