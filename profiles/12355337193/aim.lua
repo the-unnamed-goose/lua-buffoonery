@@ -11,13 +11,17 @@ getgenv().aimConfig = getgenv().aimConfig
 		maxDistance = 250,
 		maxVelocity = 40,
 		visibleParts = 4,
+
 		cameraCast = true,
 		fovCheck = true,
+		nativeUI = true,
+
 		reactionTime = 0.18,
 		actionTime = 0.32,
+
 		autoEquip = true,
 		equipInterval = 0.3,
-		nativeUI = true,
+
 		deviation = true,
 		baseDeviation = 2.05,
 		distanceFactor = 0.6,
@@ -704,9 +708,6 @@ local function handleCombat()
 	end
 end
 
-if player.Character then
-	initializePlayer()
-end
 local Module = {}
 function Module.Load()
 	if Module.Connections then
@@ -717,6 +718,9 @@ function Module.Load()
 	table.insert(Module.Connections, Run.RenderStepped:Connect(handleCombat))
 	table.insert(Module.Connections, Run.Heartbeat:Connect(handleAutoEquip))
 	table.insert(Module.Connections, player.CharacterAdded:Connect(initializePlayer))
+	if player.Character then
+		initializePlayer()
+	end
 end
 
 function Module.Unload()
@@ -729,6 +733,7 @@ function Module.Unload()
 			connection:Disconnect()
 		end
 	end
+	Module.Connections = nil
 end
 
-return Connections
+return Module

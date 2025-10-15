@@ -12,13 +12,14 @@ local params = RaycastParams.new()
 params.IgnoreWater = true
 params.FilterType = Enum.RaycastFilterType.Blacklist
 
-getgenv().silentConfig = getgenv().silentConfig or {
-  maxAngle = 15,
-  maxCosine = math.cos(math.rad(maxAngle)), -- used for performance reasons
-  targetPart = "Head",
-  rootPart = "HumanoidRootPart", -- To be used on custom characters
-  checkClosure = nil,
-}
+getgenv().silentConfig = getgenv().silentConfig
+	or {
+		maxAngle = 15,
+		maxCosine = math.cos(math.rad(maxAngle)), -- used for performance reasons
+		targetPart = "Head",
+		rootPart = "HumanoidRootPart", -- To be used on custom characters
+		checkClosure = nil,
+	}
 
 local function getDirection(origin, position)
 	return (position - origin).Unit
@@ -46,10 +47,10 @@ local function findTarget(origin, direction)
 		if not part or not humanoid or not (humanoid.Health > 0) then
 			continue
 		end
-		
+
 		local closure = config.checkClosure
 		if type(closure) == "function" and not closure(plr, character, part) then
-		  continue
+			continue
 		end
 
 		local targetDirection = getDirection(origin, part.Position)

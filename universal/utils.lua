@@ -206,7 +206,11 @@ function Module.handleTracks()
 end
 
 function Module.updateTriggerAction()
-	if getgenv().aimConfig.triggerAction and type(getgenv().aimConfig.triggerAction) == "string" then
+	if
+		getgenv().aimConfig
+		and getgenv().aimConfig.triggerAction
+		and type(getgenv().aimConfig.triggerAction) == "string"
+	then
 		local element = Module.resolveElement(getgenv().aimConfig.triggerAction)
 		if element then
 			getgenv().aimConfig.triggerAction = element

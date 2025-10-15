@@ -2,8 +2,7 @@
 local Project = "Wildcard"
 local Folder = "WindUI/" .. Project .. "/"
 local Assets = Folder .. "assets/"
---local Repository = "https://raw.githubusercontent.com/the-unnamed-goose/lua-buffoonery/master/"
-local Repository = "http://localhost:8000/"
+local Repository = "https://raw.githubusercontent.com/the-unnamed-goose/lua-buffoonery/master/"
 
 local Modules = {}
 Modules.State = {}
@@ -122,6 +121,15 @@ local Window = Wind:CreateWindow({
 	Size = UDim2.fromOffset(580, 100),
 	Resizable = true,
 	Transparent = true,
+
+	OpenButton = {
+		Title = "*",
+		CornerRadius = UDim.new(0.2, 0),
+		StrokeThickness = 3,
+		Enabled = true,
+		Draggable = true,
+		OnlyIcon = true,
+	},
 })
 
 local Config = Window.ConfigManager
@@ -207,420 +215,451 @@ local function configDrop(tab, title, desc, section, key, values)
 	})
 end
 
-do
-	local Silent = Window:Tab({
-		Title = "Silent Aim",
-		Icon = "award",
-		Locked = false,
-	})
+local Info = Window:Tab({
+	Title = "Information",
+	Icon = "circle-question-mark",
+	Locked = false,
+})
 
-	moduleToggle(Silent, "Silent Aim", "silentConfig", "universal/silent.lua")
-end
+Info:Section({
+	Title = "Credits",
+})
 
-do
-	local Aim = Window:Tab({
-		Title = "Aim Bot",
-		Icon = "crosshair",
-		Locked = false,
-	})
+Info:Paragraph({
+	Title = "Goose",
+	Desc = "The script developer, if you encounter any issues please report them bellow",
+	Buttons = {
+		{
+			Icon = "messages-square",
+			Title = "Discord Server",
+			Callback = function()
+				setclipboard("https://dsc.gg/lua-buffoonery")
+			end,
+		},
+		{
+			Icon = "github",
+			Title = "Issue Tracker",
+			Callback = function()
+				setclipboard("https://github.com/goose-birb/lua-buffoonery/issues")
+			end,
+		},
+	},
+})
 
-	Aim:Section({ Title = "General" })
-	moduleToggle(Aim, "Aim Bot", "aimConfig", "universal/aim.lua")
-	configToggle(
-		Aim,
-		"Camera Lock",
-		"Disable camera movement when aiming, can be easily detected by anticheats tho it can fix some issues",
-		"aimConfig",
-		"useHook"
-	)
-	configDrop(Aim, "Aim Mode", nil, "aimConfig", "aimMode", { "camera", "mouse" })
-	configSlider(Aim, "FOV Degrees", nil, "aimConfig", "fovDeg", 1, 90, 1, 25)
-	configSlider(Aim, "Trigger FOV Degrees", nil, "aimConfig", "triggerFovDeg", 1, 30, 1, 2)
-	configSlider(Aim, "Smoothness", nil, "aimConfig", "smoothness", 0.01, 1, 0.01, 0.25)
-	configSlider(Aim, "Prediction", nil, "aimConfig", "prediction", 0, 1, 0.01, 0.02)
-	configSlider(
-		Aim,
-		"Run Priority",
-		"Needs the aimbot to be restarted before applying, the lower the better",
-		"aimConfig",
-		"runPriority",
-		1,
-		10,
-		1,
-		10
-	)
-	configSlider(Aim, "Max Distance", nil, "aimConfig", "maxDistance", 50, 2000, 1, 500)
-	configDrop(Aim, "Target Part", nil, "aimConfig", "targetPart", Utils.getParts())
-	configToggle(Aim, "Visibility Check", "Only target visible enemies", "aimConfig", "useRay")
-	configToggle(Aim, "Team Check", "Don't target teammates", "aimConfig", "respectTeams")
-	configToggle(Aim, "Lock Camera", "Lock camera to target when aiming", "aimConfig", "lockCamera")
+Info:Paragraph({
+	Title = "Averiias",
+	Desc = "My silent aim heavily draws from theirs, with some improved logic of course.",
+})
 
-	Aim:Section({ Title = "Jitter Settings" })
-	configToggle(Aim, "Jitter", "Add random movement to aim", "aimConfig", "jitterEnabled")
-	configSlider(Aim, "Jitter Intensity", nil, "aimConfig", "jitterIntensity", 0, 1, 0.01, 0.3)
-	configSlider(Aim, "Jitter Frequency", nil, "aimConfig", "jitterFrequency", 0.1, 10, 0.1, 2.0)
-	configDrop(Aim, "Jitter Pattern", nil, "aimConfig", "jitterPattern", { "circular", "random", "sine", "square" })
-	configSlider(Aim, "Jitter Scale", nil, "aimConfig", "jitterScale", 0, 2, 0.01, 0.5)
-	configSlider(Aim, "Max Jitter Offset", nil, "aimConfig", "maxJitterOffset", 0, 10, 0.1, 3.0)
+Info:Paragraph({
+	Title = "Zyletrophene",
+	Desc = "My anticheat bypass is originally based off of theirs.",
+})
 
-	Aim:Section({ Title = "Trigger Bot" })
-	configToggle(Aim, "Trigger Bot", "Enable/Disable automatic firing", "aimConfig", "triggerBot")
+Info:Paragraph({
+	Title = "Footagesus",
+	Desc = "The main developer of Wind, a bleeding-edge UI library for Roblox.",
+})
 
-	Aim:Dropdown({
-		Title = "Trigger Mode",
-		Values = { "mouse1", "mouse2", "button", "closure" },
-		Value = getgenv().aimConfig.triggerMode,
-		Callback = function(option)
-			getgenv().aimConfig.triggerMode = option
-			if string.find(option, "mouse") and not Input.MouseEnabled then
-				Wind:Notify({
-					Title = "Warning",
-					Content = "Your game input might interrupt when triggering as it will change the current input type to mouse and keyboard.",
-					Duration = 4,
-					Icon = "triangle-alert",
-				})
-			end
+Info:Section({
+	Title = "Frequently Asked Questions",
+})
 
-			if option == "closure" then
-				Wind:Notify({
-					Title = "Info",
-					Content = "Use this only as a last resort, it will try to call an user defined triggerClosure function from the aimConfig to handle triggering.",
-					Duration = 10,
-					Icon = "circle-alert",
-				})
-			end
-			Config:Save()
-		end,
-	})
+Info:Paragraph({
+	Title = "Why aren't emotes working properly/at all?",
+	Desc = "Because some games have patches for animation injection and or require the server to replicate emote objects/animations. Eg: Most MVSD emotes",
+})
 
-	Aim:Button({
-		Title = "Capture Button",
-		Desc = "Hide UI and click the button you want to use as trigger",
-		Callback = function()
-			Utils.isCapturing = true
-			Window:Close()
+Info:Paragraph({
+	Title = "Why isn't the silent aim doing anything?",
+	Desc = "Some games may directly send the UserInputService events to the server which completely bypasses it.",
+})
 
-			Utils.scanElements()
+Info:Paragraph({
+	Title = "Why is the aim bot so buggy?",
+	Desc = "You should switch the aim mode to mouse if you have the means to, direct CFrame manipulation is inherently buggy on complex games and can be detected.",
+})
+
+Info:Paragraph({
+	Title = "Why isn't anything working?!",
+	Desc = "Probably because of a weird custom character system, you should try creating a ticket on our Discord either way.",
+})
+
+Window:Divider()
+
+local Silent = Window:Tab({
+	Title = "Silent Aim",
+	Icon = "award",
+	Locked = false,
+})
+
+moduleToggle(Silent, "Silent Aim", "silentConfig", "universal/silent.lua")
+
+local Aim = Window:Tab({
+	Title = "Aim Bot",
+	Icon = "crosshair",
+	Locked = false,
+})
+
+Aim:Section({ Title = "General" })
+moduleToggle(Aim, "Aim Bot", "aimConfig", "universal/aim.lua")
+configToggle(
+	Aim,
+	"Camera Lock",
+	"Disable camera movement when aiming, can be easily detected by anticheats tho it can fix some issues",
+	"aimConfig",
+	"useHook"
+)
+configDrop(Aim, "Aim Mode", nil, "aimConfig", "aimMode", { "camera", "mouse" })
+configSlider(Aim, "FOV Degrees", nil, "aimConfig", "fovDeg", 1, 90, 1, 25)
+configSlider(Aim, "Trigger FOV Degrees", nil, "aimConfig", "triggerFovDeg", 1, 30, 1, 2)
+configSlider(Aim, "Smoothness", nil, "aimConfig", "smoothness", 0.01, 1, 0.01, 0.25)
+configSlider(Aim, "Prediction", nil, "aimConfig", "prediction", 0, 1, 0.01, 0.02)
+configSlider(
+	Aim,
+	"Run Priority",
+	"Needs the aimbot to be restarted before applying, the lower the better",
+	"aimConfig",
+	"runPriority",
+	1,
+	10,
+	1,
+	10
+)
+configSlider(Aim, "Max Distance", nil, "aimConfig", "maxDistance", 50, 2000, 1, 500)
+configDrop(Aim, "Target Part", nil, "aimConfig", "targetPart", Utils.getParts())
+configToggle(Aim, "Visibility Check", "Only target visible enemies", "aimConfig", "useRay")
+configToggle(Aim, "Team Check", "Don't target teammates", "aimConfig", "respectTeams")
+configToggle(Aim, "Lock Camera", "Lock camera to target when aiming", "aimConfig", "lockCamera")
+
+Aim:Section({ Title = "Jitter Settings" })
+configToggle(Aim, "Jitter", "Add random movement to aim", "aimConfig", "jitterEnabled")
+configSlider(Aim, "Jitter Intensity", nil, "aimConfig", "jitterIntensity", 0, 1, 0.01, 0.3)
+configSlider(Aim, "Jitter Frequency", nil, "aimConfig", "jitterFrequency", 0.1, 10, 0.1, 2.0)
+configDrop(Aim, "Jitter Pattern", nil, "aimConfig", "jitterPattern", { "circular", "random", "sine", "square" })
+configSlider(Aim, "Jitter Scale", nil, "aimConfig", "jitterScale", 0, 2, 0.01, 0.5)
+configSlider(Aim, "Max Jitter Offset", nil, "aimConfig", "maxJitterOffset", 0, 10, 0.1, 3.0)
+
+Aim:Section({ Title = "Trigger Bot" })
+configToggle(Aim, "Trigger Bot", "Enable/Disable automatic firing", "aimConfig", "triggerBot")
+
+Aim:Dropdown({
+	Title = "Trigger Mode",
+	Values = { "mouse1", "mouse2", "button", "closure" },
+	Value = getgenv().aimConfig.triggerMode,
+	Callback = function(option)
+		getgenv().aimConfig.triggerMode = option
+		if string.find(option, "mouse") and not Input.MouseEnabled then
 			Wind:Notify({
-				Title = "Button Selection",
-				Content = "Press a button to select it",
+				Title = "Warning",
+				Content = "Your game input might interrupt when triggering as it will change the current input type to mouse and keyboard.",
 				Duration = 4,
+				Icon = "triangle-alert",
 			})
-		end,
-	})
+		end
 
-	local triggerDropValues = { "Press 'Capture Button' first" }
-	if Utils.nameList and #Utils.nameList > 0 then
-		triggerDropValues = Utils.nameList
-	end
+		if option == "closure" then
+			Wind:Notify({
+				Title = "Info",
+				Content = "Use this only as a last resort, it will try to call an user defined triggerClosure function from the aimConfig to handle triggering.",
+				Duration = 10,
+				Icon = "circle-alert",
+			})
+		end
+		Config:Save()
+	end,
+})
 
-	Aim:Dropdown({
-		Title = "Trigger Button",
-		Values = triggerDropValues,
-		Value = getgenv().aimConfig.triggerAction,
-		Callback = function(option)
-			if Utils.elementCache then
-				for _, cached in pairs(Utils.elementCache) do
-					if cached.displayName == option then
-						getgenv().aimConfig.triggerAction = cached.path
-						break
-					end
-				end
-			end
-			Config:Save()
-		end,
-	})
+Aim:Button({
+	Title = "Capture Button",
+	Desc = "Hide UI and click the button you want to use as trigger",
+	Callback = function()
+		Utils.isCapturing = true
+		Window:Close()
+
+		Utils.scanElements()
+		Wind:Notify({
+			Title = "Button Selection",
+			Content = "Press a button to select it",
+			Duration = 4,
+		})
+	end,
+})
+
+local triggerDropValues = { "Press 'Capture Button' first" }
+if Utils.nameList and #Utils.nameList > 0 then
+	triggerDropValues = Utils.nameList
 end
 
-do
-	local Bypass = Window:Tab({
-		Title = "Bypasses",
-		Icon = "shield-user",
-		Locked = false,
-	})
+Aim:Dropdown({
+	Title = "Trigger Button",
+	Values = triggerDropValues,
+	Value = getgenv().aimConfig.triggerAction,
+	Callback = function(option)
+		if Utils.elementCache then
+			for _, cached in pairs(Utils.elementCache) do
+				if cached.displayName == option then
+					getgenv().aimConfig.triggerAction = cached.path
+					break
+				end
+			end
+		end
+		Config:Save()
+	end,
+})
 
-	Bypass:Section({ Title = "General" })
+local Bypass = Window:Tab({
+	Title = "Bypasses",
+	Icon = "shield-user",
+	Locked = false,
+})
+
+Bypass:Section({ Title = "General" })
+Bypass:Toggle({
+	Flag = "bypassConfig",
+	Title = "Load Bypasses",
+	Value = getgenv().bypassConfig.enabled,
+	Callback = function(state)
+		getgenv().bypassConfig.enabled = state
+		if state then
+			Bypass:LockAll()
+			Modules.Load("universal/bypass.lua")
+		end
+		Config:Save()
+	end,
+})
+
+local bypassToggles = {
+	{ key = "core", title = "CoreGUI Asset Preload" },
+	{ key = "memory", title = "Memory Monitoring" },
+	{ key = "market", title = "MarketService Buffoonery" },
+	{ key = "parent", title = "Hidden LocalScripts" },
+	{ key = "garbage", title = "Garbage Collector Monitoring" },
+	{ key = "message", title = "LogService Monitoring" },
+	{ key = "analytics", title = "AnalyticsService C2S" },
+	{ key = "property", title = "Property Change Events" },
+}
+for _, toggleConfig in ipairs(bypassToggles) do
 	Bypass:Toggle({
-		Flag = "bypassConfig",
-		Title = "Load Bypasses",
-		Value = getgenv().bypassConfig.enabled,
+		Title = toggleConfig.title,
+		Value = getgenv().bypassConfig[toggleConfig.key],
 		Callback = function(state)
-			getgenv().bypassConfig.enabled = state
-			if state then
-			  Bypass:LockAll()
-				Modules.Load("universal/bypass.lua")
+			if getgenv().bypassConfig[toggleConfig.key] ~= state then
+				warnUser()
 			end
-			Config:Save()
-		end,
-	})
-
-	local bypassToggles = {
-		{ key = "core", title = "CoreGUI Asset Preload" },
-		{ key = "memory", title = "Memory Monitoring" },
-		{ key = "market", title = "MarketService Buffoonery" },
-		{ key = "parent", title = "Hidden LocalScripts" },
-		{ key = "garbage", title = "Garbage Collector Monitoring" },
-		{ key = "message", title = "LogService Monitoring" },
-		{ key = "analytics", title = "AnalyticsService C2S" },
-		{ key = "property", title = "Property Change Events" },
-	}
-	for _, toggleConfig in ipairs(bypassToggles) do
-		Bypass:Toggle({
-			Title = toggleConfig.title,
-			Value = getgenv().bypassConfig[toggleConfig.key],
-			Callback = function(state)
-				if getgenv().bypassConfig[toggleConfig.key] ~= state then
-					warnUser()
-				end
-				getgenv().bypassConfig[toggleConfig.key] = state
-				Config:Save()
-			end,
-		})
-	end
-
-	Bypass:Section({ Title = "Executor Specific" })
-	local executorToggles = {
-		{ key = "raw", title = "rawget" },
-		{ key = "debug", title = "debug" },
-		{ key = "proxy", title = "proxy" },
-		{ key = "memoryleak", title = "memoryleak" },
-		{ key = "environment", title = "environment" },
-	}
-
-	for _, toggleConfig in ipairs(executorToggles) do
-		Bypass:Toggle({
-			Title = toggleConfig.title,
-			Value = getgenv().bypassConfig[toggleConfig.key],
-			Callback = function(state)
-				if getgenv().bypassConfig[toggleConfig.key] ~= state then
-					warnUser()
-				end
-				getgenv().bypassConfig[toggleConfig.key] = state
-				Config:Save()
-			end,
-		})
-	end
-end
-
-do
-	local Visuals = Window:Tab({
-		Title = "Visuals",
-		Icon = "eye",
-		Locked = false,
-	})
-
-	Visuals:Section({ Title = "Players" })
-	moduleToggle(Visuals, "Player ESP", "espConfig", "universal/esp.lua")
-
-	local espToggles = {
-		{ key = "showNames", title = "Show Names", desc = "Whether or not the ESP should display name boards" },
-		{
-			key = "showDistance",
-			title = "Show Distance",
-			desc = "Whether or not the ESP should display the player distance on the name board",
-		},
-		{
-			key = "showHealth",
-			title = "Show Health",
-			desc = "Whether or not the ESP should display the player health on the name board",
-		},
-		{
-			key = "useTeamColor",
-			title = "Team Colors",
-			desc = "Whether or not the ESP highlights should use the team colors",
-		},
-	}
-	for _, toggleConfig in ipairs(espToggles) do
-		configToggle(Visuals, toggleConfig.title, toggleConfig.desc, "espConfig", toggleConfig.key)
-	end
-
-	configSlider(Visuals, "Highlight Fill Transparency", nil, "espConfig", "fillTransparency", 0, 2, 0.1, 0.5)
-	configSlider(Visuals, "Highlight Outline Transparency", nil, "espConfig", "outlineTransparency", 0, 2, 0.1, 0)
-	configSlider(Visuals, "Name Board Text Size", nil, "espConfig", "textSize", 1, 30, 1, 14)
-
-	Visuals:Colorpicker({
-		Title = "Teammate Highlight Color",
-		Default = getgenv().espConfig.teammateColor,
-		Callback = function(color)
-			getgenv().espConfig.teammateColor = color
-			Config:Save()
-		end,
-	})
-
-	Visuals:Colorpicker({
-		Title = "Enemy Highlight Color",
-		Default = getgenv().espConfig.enemyColor,
-		Callback = function(color)
-			getgenv().espConfig.enemyColor = color
-			Config:Save()
-		end,
-	})
-
-	Visuals:Section({ Title = "Emotes" })
-	Utils.refreshAnimations()
-	Visuals:Dropdown({
-		Title = "Select Emote",
-		Values = Utils.emotes,
-		Callback = function(option)
-			Utils.resumeAnimation = option
-			Utils.playAnimation(option)
-			Config:Save()
-		end,
-	})
-
-	Visuals:Input({
-		Title = "Add Emote",
-		Desc = "Adds an emote from outside the game",
-		Type = "Input",
-		Placeholder = "rbxassetid://1949963001",
-		Callback = function(input)
-			table.insert(Utils.asset, input)
-			Utils.refreshAnimations()
-			Config:Save()
-		end,
-	})
-
-	Visuals:Keybind({
-		Title = "Keybind Emote",
-		Desc = "Keybind to play the selected emote",
-		Value = "X",
-		Callback = function()
-			Utils.playAnimation(Utils.resumeAnimation)
+			getgenv().bypassConfig[toggleConfig.key] = state
 			Config:Save()
 		end,
 	})
 end
 
-do
-	local Settings = Window:Tab({
-		Title = "Settings",
-		Icon = "settings",
-		Locked = false,
-	})
+Bypass:Section({ Title = "Executor Specific" })
+local executorToggles = {
+	{ key = "raw", title = "rawget" },
+	{ key = "debug", title = "debug" },
+	{ key = "proxy", title = "proxy" },
+	{ key = "memoryleak", title = "memoryleak" },
+	{ key = "environment", title = "environment" },
+}
 
-	Settings:Section({ Title = "Configuration" })
-	Settings:Keybind({
-		Title = "Window toggle",
-		Desc = "Keybind to toggle ui",
-		Value = "X",
-		Callback = function(key)
-			Window:SetToggleKey(Enum.KeyCode[key])
-			Config:Save()
-		end,
-	})
-
-	local themes = {}
-	for theme in Wind:GetThemes() do
-		table.insert(themes, theme)
-	end
-	table.sort(themes)
-
-	Settings:Dropdown({
-		Title = "Theme",
-		Values = themes,
-		Callback = function(option)
-			Wind:SetTheme(option)
-			Config:Save()
-		end,
-	})
-
-	Settings:Input({
-		Title = "Profile Name",
-		Desc = "Creates a new profile, if needed",
-		Type = "Input",
-		Placeholder = "default",
-		Callback = function(input)
-			default = Config:CreateConfig(input)
-		end,
-	})
-
-	local profiles = {}
-	for _, profile in listfiles(Assets) do
-		table.insert(profiles, string.split(profile, ".")[1])
-	end
-	table.sort(profiles)
-
-	Settings:Dropdown({
-		Title = "Select Profile",
-		Values = profiles,
-		Callback = function(option)
-			default = Config:CreateConfig(option)
-			Config:Save()
-		end,
-	})
-
-	Settings:Toggle({
-		Title = "Auto Load Config",
-		Desc = "Load settings automatically on startup",
-		Value = isfile(loadFlag),
+for _, toggleConfig in ipairs(executorToggles) do
+	Bypass:Toggle({
+		Title = toggleConfig.title,
+		Value = getgenv().bypassConfig[toggleConfig.key],
 		Callback = function(state)
-			if state then
-				writefile(loadFlag, "")
-			else
-				delfile(loadFlag)
+			if getgenv().bypassConfig[toggleConfig.key] ~= state then
+				warnUser()
 			end
+			getgenv().bypassConfig[toggleConfig.key] = state
 			Config:Save()
 		end,
-	})
-
-	Settings:Toggle({
-		Title = "Auto Save Config",
-		Desc = "Save settings automatically when changed",
-		Value = isfile(saveFlag),
-		Callback = function(state)
-			if state then
-				writefile(saveFlag, "")
-			else
-				delfile(saveFlag)
-			end
-			Config:Save()
-		end,
-	})
-
-	Settings:Section({ Title = "Credits" })
-	Settings:Paragraph({
-		Title = "Goose",
-		Desc = "The script developer, if you encounter any issues please report them bellow",
-		Buttons = {
-			{
-				Icon = "messages-square",
-				Title = "Discord Server",
-				Callback = function()
-					setclipboard("https://dsc.gg/lua-buffoonery")
-				end,
-			},
-			{
-				Icon = "github",
-				Title = "Issue Tracker",
-				Callback = function()
-					setclipboard("https://github.com/goose-birb/lua-buffoonery/issues")
-				end,
-			},
-		},
-	})
-
-	Settings:Paragraph({
-		Title = "Averiias",
-		Desc = "My silent aim heavily draws from theirs, with some improved logic of course.",
-	})
-
-	Settings:Paragraph({
-		Title = "Zyletrophene",
-		Desc = "My anticheat bypass is originally based off of theirs.",
-	})
-
-	Settings:Paragraph({
-		Title = "Footagesus",
-		Desc = "The main developer of Wind, a bleeding-edge UI library for Roblox.",
 	})
 end
+
+local Visuals = Window:Tab({
+	Title = "Visuals",
+	Icon = "eye",
+	Locked = false,
+})
+
+Visuals:Section({ Title = "Players" })
+moduleToggle(Visuals, "Player ESP", "espConfig", "universal/esp.lua")
+
+local espToggles = {
+	{ key = "showNames", title = "Show Names", desc = "Whether or not the ESP should display name boards" },
+	{
+		key = "showDistance",
+		title = "Show Distance",
+		desc = "Whether or not the ESP should display the player distance on the name board",
+	},
+	{
+		key = "showHealth",
+		title = "Show Health",
+		desc = "Whether or not the ESP should display the player health on the name board",
+	},
+	{
+		key = "useTeamColor",
+		title = "Team Colors",
+		desc = "Whether or not the ESP highlights should use the team colors",
+	},
+}
+for _, toggleConfig in ipairs(espToggles) do
+	configToggle(Visuals, toggleConfig.title, toggleConfig.desc, "espConfig", toggleConfig.key)
+end
+
+configSlider(Visuals, "Highlight Fill Transparency", nil, "espConfig", "fillTransparency", 0, 2, 0.1, 0.5)
+configSlider(Visuals, "Highlight Outline Transparency", nil, "espConfig", "outlineTransparency", 0, 2, 0.1, 0)
+configSlider(Visuals, "Name Board Text Size", nil, "espConfig", "textSize", 1, 30, 1, 14)
+
+Visuals:Colorpicker({
+	Title = "Teammate Highlight Color",
+	Default = getgenv().espConfig.teammateColor,
+	Callback = function(color)
+		getgenv().espConfig.teammateColor = color
+		Config:Save()
+	end,
+})
+
+Visuals:Colorpicker({
+	Title = "Enemy Highlight Color",
+	Default = getgenv().espConfig.enemyColor,
+	Callback = function(color)
+		getgenv().espConfig.enemyColor = color
+		Config:Save()
+	end,
+})
+
+Visuals:Section({ Title = "Emotes" })
+Utils.refreshAnimations()
+Visuals:Dropdown({
+	Title = "Select Emote",
+	Values = Utils.emotes,
+	Callback = function(option)
+		Utils.resumeAnimation = option
+		Utils.playAnimation(option)
+		Config:Save()
+	end,
+})
+
+Visuals:Input({
+	Title = "Add Emote",
+	Desc = "Adds an emote from outside the game",
+	Type = "Input",
+	Placeholder = "rbxassetid://1949963001",
+	Callback = function(input)
+		table.insert(Utils.asset, input)
+		Utils.refreshAnimations()
+		Config:Save()
+	end,
+})
+
+Visuals:Keybind({
+	Title = "Keybind Emote",
+	Desc = "Keybind to play the selected emote",
+	Value = "X",
+	Callback = function()
+		Utils.playAnimation(Utils.resumeAnimation)
+		Config:Save()
+	end,
+})
+
+local Settings = Window:Tab({
+	Title = "Settings",
+	Icon = "settings",
+	Locked = false,
+})
+
+Settings:Section({ Title = "Configuration" })
+Settings:Keybind({
+	Title = "Window toggle",
+	Desc = "Keybind to toggle ui",
+	Value = "X",
+	Callback = function(key)
+		Window:SetToggleKey(Enum.KeyCode[key])
+		Config:Save()
+	end,
+})
+
+local themes = {}
+for theme in Wind:GetThemes() do
+	table.insert(themes, theme)
+end
+table.sort(themes)
+
+Settings:Dropdown({
+	Title = "Theme",
+	Values = themes,
+	Callback = function(option)
+		Wind:SetTheme(option)
+		Config:Save()
+	end,
+})
+
+Settings:Input({
+	Title = "Profile Name",
+	Desc = "Creates a new profile, if needed",
+	Type = "Input",
+	Placeholder = "default",
+	Callback = function(input)
+		default = Config:CreateConfig(input)
+	end,
+})
+
+local profiles = {}
+for _, profile in listfiles(Assets) do
+	table.insert(profiles, string.split(profile, ".")[1])
+end
+table.sort(profiles)
+
+Settings:Dropdown({
+	Title = "Select Profile",
+	Values = profiles,
+	Callback = function(option)
+		default = Config:CreateConfig(option)
+		Config:Save()
+	end,
+})
+
+Settings:Toggle({
+	Title = "Auto Load Config",
+	Desc = "Load settings automatically on startup",
+	Value = isfile(loadFlag),
+	Callback = function(state)
+		if state then
+			writefile(loadFlag, "")
+		else
+			delfile(loadFlag)
+		end
+		Config:Save()
+	end,
+})
+
+Settings:Toggle({
+	Title = "Auto Save Config",
+	Desc = "Save settings automatically when changed",
+	Value = isfile(saveFlag),
+	Callback = function(state)
+		if state then
+			writefile(saveFlag, "")
+		else
+			delfile(saveFlag)
+		end
+		Config:Save()
+	end,
+})
 
 default:Set("asset", Utils.asset)
 default:Set("themes", themes)
 Window:SelectTab(1)
 
+if isfile(loadFlag) then
+	local data = default:Load()
+	Utils.asset = data.asset or {}
+	Utils.refreshAnimations()
+end
+
 do
-	local version = Window.Folder .. "/" .. "version"
+	local version = Folder .. "/" .. "version"
 	local current = isfile(version) and readfile(version)
 	local latest = game:HttpGet(Repository .. "version")
 	if current and current ~= latest then

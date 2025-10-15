@@ -33,3 +33,5 @@ function Module.Unload()
 
 	Moudle.Connection:Disconnect()
 end
+
+return Module

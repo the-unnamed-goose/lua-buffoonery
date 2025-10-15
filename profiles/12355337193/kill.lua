@@ -17,7 +17,8 @@ getgenv().controllers = getgenv().controllers
 		gunCooldown = 0,
 	}
 
-local player = Players.player
+local player = Players.LocalPlayer
+local currentLoop = nil
 local enemyCache = {}
 
 function updateCache()
@@ -64,6 +65,7 @@ local function killKnife()
 		return
 	end
 
+	currentLoop = WEAPON_TYPE.knife
 	for _, part in pairs(enemyCache) do
 		task.spawn(function()
 			if part then
@@ -74,6 +76,7 @@ local function killKnife()
 			end
 		end)
 	end
+	currentLoop = nil
 end
 
 local function killGun()
@@ -83,7 +86,11 @@ local function killGun()
 	end
 
 	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoidRootPart then
+		return
+	end
 
+	currentLoop = WEAPON_TYPE.gun
 	for _, part in pairs(enemyCache) do
 		task.spawn(function()
 			if part then
@@ -91,6 +98,7 @@ local function killGun()
 			end
 		end)
 	end
+	currentLoop = WEAPON_TYPE.gun
 end
 
 local Module = {}
@@ -111,12 +119,7 @@ function Module.Load()
 
 			getgenv().controllers.gunLocked = true
 			getgenv().controllers.knifeLocked = true
-
-			if getgenv().killLoop.gun then
-				equipWeapon(WEAPON_TYPE.gun)
-			elseif getgenv().killLoop.knife then
-				equipWeapon(WEAPON_TYPE.knife)
-			end
+			equipWeapon(currentLoop)
 
 			local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 3)
 			if not humanoidRootPart or not player:GetAttribute("Match") then
@@ -125,9 +128,9 @@ function Module.Load()
 
 			local anchoredConnection = humanoidRootPart:GetPropertyChangedSignal("Anchored"):Connect(function()
 				if not humanoidRootPart.Anchored then
-					if getgenv().killLoop.gun then
+					if currentLoop == WEAPON_TYPE.gun then
 						getgenv().controllers.gunLocked = false
-					elseif getgenv().killLoop.knife then
+					elseif currentLoop == WEAPON_TYPE.knife then
 						getgenv().controllers.knifeLocked = false
 					end
 
@@ -150,6 +153,7 @@ function Module.Unload()
 			connection:Disconnect()
 		end
 	end
+	Module.Connections = nil
 end
 
 function Module.gunButton()
@@ -166,7 +170,9 @@ function Module.gunToggle()
 	table.insert(
 		Module.Connections,
 		Run.RenderStepped:Connect(function()
-			killGun()
+			if not getgenv().controllers.gunLocked then
+				killGun()
+			end
 		end)
 	)
 end
@@ -175,9 +181,11 @@ function Module.knifeToggle()
 	table.insert(
 		Module.Connections,
 		Run.RenderStepped:Connect(function()
-			killKnife()
+			if not getgenv().controllers.knifeLocked then
+				killKnife()
+			end
 		end)
 	)
 end
 
-return Connections
+return Module

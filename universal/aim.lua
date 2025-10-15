@@ -148,7 +148,7 @@ local function applyJitter(direction, jitterOffset)
 	local right = direction:Cross(Vector3.new(0, 1, 0)).Unit
 	local up = right:Cross(direction).Unit
 
-  -- It's Jitterin' time
+	-- It's Jitterin' time
 	local jittered = direction + right * jitterOffset.X + up * jitterOffset.Y
 	return jittered.Unit
 end
@@ -219,10 +219,10 @@ local function findTarget()
 		if not part then
 			continue
 		end
-		
+
 		local closure = config.checkClosure
 		if type(closure) == "function" and not closure(plr, character, part) then
-		  continue
+			continue
 		end
 
 		local distance = (camPos - part.Position).Magnitude

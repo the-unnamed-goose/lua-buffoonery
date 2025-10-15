@@ -106,11 +106,11 @@ function Module.Load()
 				return
 			end
 
-			if getgenv().espTeammates then
+			if getgenv().espConfig.teammates then
 				renderTeam(Teams.Teammates)
 			end
 
-			if getgenv().espEnemies then
+			if getgenv().espConfig.enemies then
 				renderTeam(Teams.Enemies)
 			end
 		end)
@@ -127,6 +127,7 @@ function Module.Unload()
 			connection:Disconnect()
 		end
 	end
+	Module.Connections = nil
 end
 
-return Connections
+return Module
