@@ -49,7 +49,7 @@ local function findTarget(origin, direction)
 			continue
 		end
 
-		local closure = config.checkClosure
+		local closure = getgenv().silentConfig.checkClosure
 		if type(closure) == "function" and not closure(plr, character, part) then
 			continue
 		end

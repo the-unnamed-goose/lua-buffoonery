@@ -700,7 +700,7 @@ do
 		Wind:Popup({
 			Title = "Version Manager",
 			Icon = "download",
-			Content = "A new Wildcard version is available, do you wish to install it?",
+			Content = "A new version is available, do you wish to install it?",
 			Buttons = {
 				{
 					Title = "Maybe later",
