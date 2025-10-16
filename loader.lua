@@ -386,5 +386,5 @@ if current.notes and current.notes[executor] then
 	})
 end
 
-pcall(loadstring, fetch(current.location))
+loadstring(fetch(current.location))()
 return Store
