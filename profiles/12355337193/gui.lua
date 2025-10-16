@@ -745,3 +745,35 @@ Modules.State["config"] = true
 if isfile(loadFlag) then
 	Window.CurrentConfig:Load()
 end
+
+do
+	local version = Folder .. "/" .. "version"
+	local current = isfile(version) and readfile(version)
+	local latest = game:HttpGet(Repository .. "version")
+	if current and current ~= latest then
+		Window:Close()
+		Wind:Popup({
+			Title = "Version Manager",
+			Icon = "download",
+			Content = "A new Wildcard version is available, do you wish to install it?",
+			Buttons = {
+				{
+					Title = "Maybe later",
+					Callback = Window.Open,
+					Variant = "Tertiary",
+				},
+				{
+					Title = "Yes",
+					Callback = function()
+						writefile(version, latest)
+						delfolder(Assets)
+						Window:Open()
+					end,
+					Variant = "Primary",
+				},
+			},
+		})
+	elseif not current then
+		writefile(version, latest)
+	end
+end

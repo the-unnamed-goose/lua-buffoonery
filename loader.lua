@@ -340,16 +340,6 @@ local Store = {
 		},
 	},
 }
-local function fetch(file)
-	local cache = Assets .. file
-	local content = isfile(cache) and readfile(cache)
-	if not content or content == "" then
-		content = game:HttpGet(Repository .. file)
-		writefile(cache, content)
-	end
-
-	return content
-end
 
 local current = Store[game.PlaceId] or Store["*"]
 for _, dependency in ipairs(current.dependencies) do
@@ -386,5 +376,5 @@ if current.notes and current.notes[executor] then
 	})
 end
 
-loadstring(fetch(current.location))()
+loadstring(game:HttpGet(Repository .. current.location))()
 return Store
