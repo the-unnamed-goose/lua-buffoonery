@@ -44,7 +44,7 @@ local function findTarget(origin, direction)
 
 		local character = plr.Character or findChild(workspace, plr.Name)
 		local part = character and findChild(character, getgenv().silentConfig.targetPart)
-		local humanoid = character and findChild(character, getgenv().silentConfig.rootPart)
+		local humanoid = character and findChild(character, "Humanoid")
 		if not part or not humanoid or not (humanoid.Health > 0) then
 			continue
 		end
