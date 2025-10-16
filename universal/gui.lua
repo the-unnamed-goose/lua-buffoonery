@@ -149,6 +149,14 @@ local default = Config:CreateConfig("default")
 local saveFlag = Folder .. "/flags/autosave"
 local loadFlag = Folder .. "/flags/autoload"
 
+local function loadConfigs()
+	if isfile(loadFlag) then
+		local data = default:Load()
+		Utils.asset = data.asset or {}
+		Utils.refreshAnimations()
+	end
+end
+
 local function warnUser()
 	Wind:Notify({
 		Title = "Warning",
@@ -645,12 +653,12 @@ Settings:Dropdown({
 })
 
 Settings:Button({
-    Title = "Delete Profile",
-    Callback = function()
-        if default then 
-          delfile(default.Path)
-        end
-    end
+	Title = "Delete Profile",
+	Callback = function()
+		if default then
+			delfile(default.Path)
+		end
+	end,
 })
 
 Settings:Toggle({
@@ -685,12 +693,6 @@ default:Set("asset", Utils.asset)
 default:Set("themes", themes)
 Window:SelectTab(1)
 
-if isfile(loadFlag) then
-	local data = default:Load()
-	Utils.asset = data.asset or {}
-	Utils.refreshAnimations()
-end
-
 do
 	local version = Folder .. "/" .. "version"
 	local current = isfile(version) and readfile(version)
@@ -712,13 +714,15 @@ do
 					Callback = function()
 						writefile(version, latest)
 						delfolder(Assets)
+						loadConfigs()
 						Window:Open()
 					end,
 					Variant = "Primary",
 				},
 			},
 		})
-	elseif not current then
+	else
+		loadConfigs()
 		writefile(version, latest)
 	end
 end

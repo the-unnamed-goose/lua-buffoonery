@@ -124,6 +124,14 @@ function Config.Save()
 	end
 end
 
+local function loadConfigs()
+	if isfile(loadFlag) then
+		local data = default:Load()
+		Utils.asset = data.asset or {}
+		Utils.refreshAnimations()
+	end
+end
+
 function lockToggle(origin)
 	if origin == "knife" and gunToggle and gunToggle.Lock then
 		gunToggle:Lock()
@@ -742,9 +750,6 @@ Settings:Toggle({
 
 Window:SelectTab(1)
 Modules.State["config"] = true
-if isfile(loadFlag) then
-	Window.CurrentConfig:Load()
-end
 
 do
 	local version = Folder .. "/" .. "version"
@@ -755,7 +760,7 @@ do
 		Wind:Popup({
 			Title = "Version Manager",
 			Icon = "download",
-			Content = "A new Wildcard version is available, do you wish to install it?",
+			Content = "A new version is available, do you wish to install it?",
 			Buttons = {
 				{
 					Title = "Maybe later",
@@ -767,13 +772,15 @@ do
 					Callback = function()
 						writefile(version, latest)
 						delfolder(Assets)
+						loadConfigs()
 						Window:Open()
 					end,
 					Variant = "Primary",
 				},
 			},
 		})
-	elseif not current then
+	else
+		loadConfigs()
 		writefile(version, latest)
 	end
 end
