@@ -110,10 +110,13 @@ getgenv().bypassConfig = {
 
 getgenv().silentConfig = getgenv().silentConfig
 	or {
+	  enabled = true,
 		maxAngle = 15,
-		maxCosine = math.cos(math.rad(15)), -- used for performance reasons
+		maxCosine = math.cos(math.rad(15)),
 		targetPart = "Head",
-		rootPart = "HumanoidRootPart", -- To be used on custom characters
+		rootPart = "HumanoidRootPart",
+		prediction = 0.02,
+		checkVisible = true,
 		checkClosure = nil,
 	}
 
@@ -290,6 +293,11 @@ Info:Paragraph({
 	Desc = "Probably because of a weird custom character system, you should try creating a ticket on our Discord either way.",
 })
 
+Info:Paragraph({
+	Title = "Can I set keybinds for anything?",
+	Desc = "Not yet, I'm waiting for upstream to add a keybind manager as that can't really be done from outside the library :/",
+})
+
 Window:Divider()
 
 local Silent = Window:Tab({
@@ -315,6 +323,8 @@ Silent:Slider({
 	end,
 })
 
+configSlider(Silent, "Prediction", nil, "silentConfig", "prediction", 0, 1, 0.01)
+configToggle(Silent, "Visibility Check", "Only target visible enemies", "silentConfig", "useRay")
 configDrop(Silent, "Target Part", nil, "silentConfig", "targetPart", Utils.getParts())
 configDrop(Silent, "Target Part", nil, "silentConfig", "rootPart", Utils.getParts())
 
@@ -334,10 +344,10 @@ configToggle(
 	"useHook"
 )
 configDrop(Aim, "Aim Mode", nil, "aimConfig", "aimMode", { "camera", "mouse" })
-configSlider(Aim, "FOV Degrees", nil, "aimConfig", "fovDeg", 1, 90, 1, 25)
-configSlider(Aim, "Trigger FOV Degrees", nil, "aimConfig", "triggerFovDeg", 1, 30, 1, 2)
-configSlider(Aim, "Smoothness", nil, "aimConfig", "smoothness", 0.01, 1, 0.01, 0.25)
-configSlider(Aim, "Prediction", nil, "aimConfig", "prediction", 0, 1, 0.01, 0.02)
+configSlider(Aim, "FOV Degrees", nil, "aimConfig", "fovDeg", 1, 90, 1)
+configSlider(Aim, "Trigger FOV Degrees", nil, "aimConfig", "triggerFovDeg", 1, 30, 1)
+configSlider(Aim, "Smoothness", nil, "aimConfig", "smoothness", 0.01, 1, 0.01)
+configSlider(Aim, "Prediction", nil, "aimConfig", "prediction", 0, 1, 0.01)
 configSlider(
 	Aim,
 	"Run Priority",
@@ -346,10 +356,9 @@ configSlider(
 	"runPriority",
 	1,
 	10,
-	1,
-	10
+	1
 )
-configSlider(Aim, "Max Distance", nil, "aimConfig", "maxDistance", 50, 2000, 1, 500)
+configSlider(Aim, "Max Distance", nil, "aimConfig", "maxDistance", 50, 2000, 1)
 configDrop(Aim, "Target Part", nil, "aimConfig", "targetPart", Utils.getParts())
 configToggle(Aim, "Visibility Check", "Only target visible enemies", "aimConfig", "useRay")
 configToggle(Aim, "Team Check", "Don't target teammates", "aimConfig", "respectTeams")
@@ -357,11 +366,11 @@ configToggle(Aim, "Lock Camera", "Lock camera to target when aiming", "aimConfig
 
 Aim:Section({ Title = "Jitter Settings" })
 configToggle(Aim, "Jitter", "Add random movement to aim", "aimConfig", "jitterEnabled")
-configSlider(Aim, "Jitter Intensity", nil, "aimConfig", "jitterIntensity", 0, 1, 0.01, 0.3)
-configSlider(Aim, "Jitter Frequency", nil, "aimConfig", "jitterFrequency", 0.1, 10, 0.1, 2.0)
+configSlider(Aim, "Jitter Intensity", nil, "aimConfig", "jitterIntensity", 0, 1, 0.01)
+configSlider(Aim, "Jitter Frequency", nil, "aimConfig", "jitterFrequency", 0.1, 10, 0.1)
 configDrop(Aim, "Jitter Pattern", nil, "aimConfig", "jitterPattern", { "circular", "random", "sine", "square" })
-configSlider(Aim, "Jitter Scale", nil, "aimConfig", "jitterScale", 0, 2, 0.01, 0.5)
-configSlider(Aim, "Max Jitter Offset", nil, "aimConfig", "maxJitterOffset", 0, 10, 0.1, 3.0)
+configSlider(Aim, "Jitter Scale", nil, "aimConfig", "jitterScale", 0, 2, 0.01)
+configSlider(Aim, "Max Jitter Offset", nil, "aimConfig", "maxJitterOffset", 0, 10, 0.1)
 
 Aim:Section({ Title = "Trigger Bot" })
 configToggle(Aim, "Trigger Bot", "Enable/Disable automatic firing", "aimConfig", "triggerBot")
@@ -530,9 +539,9 @@ for _, toggleConfig in ipairs(espToggles) do
 	configToggle(Visuals, toggleConfig.title, toggleConfig.desc, "espConfig", toggleConfig.key)
 end
 
-configSlider(Visuals, "Highlight Fill Transparency", nil, "espConfig", "fillTransparency", 0, 2, 0.1, 0.5)
-configSlider(Visuals, "Highlight Outline Transparency", nil, "espConfig", "outlineTransparency", 0, 2, 0.1, 0)
-configSlider(Visuals, "Name Board Text Size", nil, "espConfig", "textSize", 1, 30, 1, 14)
+configSlider(Visuals, "Highlight Fill Transparency", nil, "espConfig", "fillTransparency", 0, 2, 0.1)
+configSlider(Visuals, "Highlight Outline Transparency", nil, "espConfig", "outlineTransparency", 0, 2, 0.1)
+configSlider(Visuals, "Name Board Text Size", nil, "espConfig", "textSize", 1, 30, 1)
 
 Visuals:Colorpicker({
 	Title = "Teammate Highlight Color",
@@ -624,19 +633,15 @@ local profileSelector = Settings:Input({
 	Type = "Input",
 	Placeholder = "default",
 	Callback = function(input)
-		default = Config:CreateConfig(input)
+	  if input ~= "" then
+		  default = Config:CreateConfig(input)
+		end
 	end,
 })
 
-local profiles = {}
-for _, profile in listfiles(Assets) do
-	table.insert(profiles, string.split(profile, ".")[1])
-end
-table.sort(profiles)
-
 Settings:Dropdown({
 	Title = "Select Profile",
-	Values = profiles,
+	Values = Utils.refreshConfigs(),
 	Callback = function(option)
 		default = Config:CreateConfig(option)
 		profileSelector:Set(option)
@@ -648,11 +653,32 @@ Settings:Button({
     Title = "Delete Profile",
     Callback = function()
         if default then 
-          delfile(default.Path)
+          default:Delete()
+          Utils.refreshConfigs()
         end
     end
 })
 
+Settings:Button({
+    Title = "Load Profile",
+    Callback = function()
+        if default then 
+          default:Save()
+        end
+    end
+})
+
+Settings:Button({
+    Title = "Save Profile",
+    Callback = function()
+        if default then 
+          default:Save()
+          Utils.refreshConfigs()
+        end
+    end
+})
+
+Settings:Section({ Title = "Configuration Flags" })
 Settings:Toggle({
 	Title = "Auto Load Config",
 	Desc = "Load settings automatically on startup",
