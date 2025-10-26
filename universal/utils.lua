@@ -218,7 +218,7 @@ function Module.updateTriggerAction()
 	end
 end
 
-function Modules.refreshConfigs()
+function Module.refreshConfigs()
 	local profiles = {}
 	for _, profile in listfiles(Folder .. "config/") do
 		print(profile)
