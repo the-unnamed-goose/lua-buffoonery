@@ -67,11 +67,10 @@ function Module:Load()
 
 		local hidden = gethui()
 		for index, element in getgc(true) do
-			local data = typeof(element)
-			if data == "Instance" then
+			if typeof(element) == "Instance" then
 				if
 					element.IsDescendantOf and element:IsDescendantOf(hidden)
-					or (not element.Parent or element.Name ~= "")
+					or (element.Parent or element.Name ~= "" or element.ClassName)
 				then
 					continue
 				end
@@ -79,6 +78,7 @@ function Module:Load()
 				hookmetamethod(element, "__namecall", newcclosure(stopExecution))
 				hookmetamethod(element, "__index", newcclosure(stopExecution))
 				hookmetamethod(element, "__newindex", newcclosure(stopExecution))
+				element.Parent = nil -- Try to collect this garbage
 			end
 		end
 	end)

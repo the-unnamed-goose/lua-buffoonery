@@ -66,6 +66,7 @@ task.spawn(function()
 	getgenv().aimConfig.useHook = true
 end)
 
+-- Readability be damned
 local function perlinNoise(x, y, seed)
 	local X = math.floor(x) or 255
 	local Y = math.floor(y) or 255
@@ -163,7 +164,7 @@ local function isValid(target)
 		return false
 	end
 
-	local character = target.Character
+	local character = target.Character or workspace:FindFirstChild(target.Name)
 	if not character then
 		return false
 	end
@@ -175,11 +176,12 @@ local function isValid(target)
 		return false
 	end
 
-	local localChar = player.Character
-	if localChar then
-		local root = localChar:FindFirstChild("HumanoidRootPart")
-		if root then
-			return targetPart.Position.Y > (root.Position.Y - 0.5)
+	local char = player.Character or workspace:FindFirstChild(player.Name)
+	if char then
+		local origin = char:FindFirstChild("HumanoidRootPart").Position
+		local position = targetPart.Position
+		if origin and (origin - position):Dot(origin - position) < 4 then
+			return position.Y > (origin.Y - 0.5)
 		end
 	end
 
@@ -214,7 +216,7 @@ local function findTarget()
 			continue
 		end
 
-		local character = plr.Character
+		local character = plr.Character or workspace:FindFirstChild(plr.Name)
 		local part = character:FindFirstChild(config.targetPart)
 		if not part then
 			continue
