@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+-- This file is licensed under the Perl Artistic License License. See https://dev.perl.org/licenses/artistic.html for more details.
+=======
 -- Heavily inspired from Averiias's Universal-SilentAim
+>>>>>>> development
 local Players = game:GetService("Players")
 local Run = game:GetService("RunService")
 
@@ -17,14 +21,14 @@ params.FilterType = Enum.RaycastFilterType.Blacklist
 getgenv().silentConfig = getgenv().silentConfig
 	or {
 		enabled = true,
-
+		
 		maxAngle = 15,
 		maxCosine = math.cos(math.rad(15)),
 		checkClosure = nil,
-
+		
 		targetPart = "Head",
 		rootPart = "HumanoidRootPart",
-
+		
 		prediction = 0.02,
 		useRay = true,
 	}
@@ -157,10 +161,11 @@ index = hookmetamethod(
 	"__index",
 	newcclosure(function(self, field, ...)
 		if self == mouse and getgenv().silentConfig.enabled and not checkcaller() then
+
 			if field == "Target" or field == "target" then
 				return findTarget()
 			elseif field == "Hit" or field == "hit" then
-				local target = findTarget()
+			  local target = findTarget()
 				if getgenv().silentConfig.prediction and target then
 					return target.CFrame + (target.Velocity * getgenv().silentConfig.prediction)
 				end
@@ -242,7 +247,7 @@ function Module.Drop()
 		metatable.__namecall = worldroot
 		setrawmetatable(workspace, metatable)
 	end
-
+	
 	if index then
 		local metatable = table.clone(getrawmetatable(game))
 		metatable.__index = index

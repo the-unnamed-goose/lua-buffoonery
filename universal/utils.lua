@@ -219,13 +219,13 @@ function Module.updateTriggerAction()
 end
 
 function Modules.refreshConfigs()
-  local profiles = {}
-for _, profile in listfiles(Folder .. "config/") do
-  print(profile)
-	table.insert(profiles, string.split(profile, ".")[1])
-end
-table.sort(profiles)
-return profiles
+	local profiles = {}
+	for _, profile in listfiles(Folder .. "config/") do
+		print(profile)
+		table.insert(profiles, string.split(profile, ".")[1])
+	end
+	table.sort(profiles)
+	return profiles
 end
 
 function Module.Load()

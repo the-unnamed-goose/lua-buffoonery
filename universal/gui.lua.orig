@@ -110,7 +110,7 @@ getgenv().bypassConfig = {
 
 getgenv().silentConfig = getgenv().silentConfig
 	or {
-		enabled = false,
+	  enabled = true,
 		maxAngle = 15,
 		maxCosine = math.cos(math.rad(15)),
 		targetPart = "Head",
@@ -641,8 +641,8 @@ local profileSelector = Settings:Input({
 	Type = "Input",
 	Placeholder = "default",
 	Callback = function(input)
-		if input ~= "" then
-			default = Config:CreateConfig(input)
+	  if input ~= "" then
+		  default = Config:CreateConfig(input)
 		end
 	end,
 })
@@ -658,32 +658,41 @@ Settings:Dropdown({
 })
 
 Settings:Button({
+<<<<<<< HEAD
 	Title = "Delete Profile",
 	Callback = function()
 		if default then
-			default:Delete()
-			Utils.refreshConfigs()
+			delfile(default.Path)
 		end
 	end,
+=======
+    Title = "Delete Profile",
+    Callback = function()
+        if default then 
+          default:Delete()
+          Utils.refreshConfigs()
+        end
+    end
+>>>>>>> development
 })
 
 Settings:Button({
-	Title = "Load Profile",
-	Callback = function()
-		if default then
-			default:Save()
-		end
-	end,
+    Title = "Load Profile",
+    Callback = function()
+        if default then 
+          default:Save()
+        end
+    end
 })
 
 Settings:Button({
-	Title = "Save Profile",
-	Callback = function()
-		if default then
-			default:Save()
-			Utils.refreshConfigs()
-		end
-	end,
+    Title = "Save Profile",
+    Callback = function()
+        if default then 
+          default:Save()
+          Utils.refreshConfigs()
+        end
+    end
 })
 
 Settings:Section({ Title = "Configuration Flags" })
